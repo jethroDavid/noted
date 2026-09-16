@@ -1,0 +1,8 @@
+.local/
+.next/
+coverage/
+dist/
+node_modules/
+pnpm-lock.yaml
+packages/database/drizzle/meta/
+PLAN.md

@@ -1,0 +1,41 @@
+name: noted
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-noted}
+      POSTGRES_USER: ${POSTGRES_USER:-noted}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-noted_local_only}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    # The official image initializes volume ownership before dropping to its
+    # postgres user, so capabilities are not removed during local initialization.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0
+    stop_grace_period: 30s
+
+volumes:
+  postgres-data:
+
+networks:
+  data:
+    driver: bridge

@@ -1,0 +1,39 @@
+{
+  "name": "noted",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "local:setup": "node scripts/setup-local.mjs",
+    "dev": "pnpm --filter @noted/web dev",
+    "dev:services": "docker compose up -d --wait",
+    "dev:all": "pnpm local:setup && pnpm dev:services && pnpm db:migrate && pnpm dev",
+    "services:down": "docker compose down",
+    "db:generate": "pnpm --filter @noted/database db:generate",
+    "db:migrate": "pnpm --filter @noted/database db:migrate",
+    "db:seed": "pnpm --filter @noted/database db:seed",
+    "db:studio": "pnpm --filter @noted/database db:studio",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "vitest run",
+    "build": "pnpm --filter @noted/web build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.20.3",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.5",
+    "prettier": "3.9.7",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}
