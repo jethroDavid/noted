@@ -1,0 +1,22 @@
+{
+  "name": "@noted/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noted/contracts": "workspace:*",
+    "@noted/database": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "firebase-admin": "14.4.0"
+  },
+  "devDependencies": {
+    "@noted/typescript-config": "workspace:*",
+    "typescript": "5.9.3"
+  }
+}

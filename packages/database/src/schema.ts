@@ -44,7 +44,10 @@ export const homes = pgTable("homes", {
   name: text("name").notNull(),
   creatorUserId: uuid("creator_user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "restrict" }),
+    .references(() => users.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -58,10 +61,10 @@ export const homeMemberships = pgTable(
   {
     homeId: uuid("home_id")
       .notNull()
-      .references(() => homes.id, { onDelete: "cascade" }),
+      .references(() => homes.id, { onDelete: "cascade", onUpdate: "cascade" }),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
     joinedAt: timestamp("joined_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -78,11 +81,14 @@ export const homeInvitations = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     homeId: uuid("home_id")
       .notNull()
-      .references(() => homes.id, { onDelete: "cascade" }),
+      .references(() => homes.id, { onDelete: "cascade", onUpdate: "cascade" }),
     targetEmail: text("target_email").notNull(),
     inviterUserId: uuid("inviter_user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -105,7 +111,7 @@ export const boards = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     homeId: uuid("home_id")
       .notNull()
-      .references(() => homes.id, { onDelete: "cascade" }),
+      .references(() => homes.id, { onDelete: "cascade", onUpdate: "cascade" }),
     kind: boardKind("kind").notNull().default("fridge"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -122,7 +128,7 @@ export const mediaAssets = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     homeId: uuid("home_id")
       .notNull()
-      .references(() => homes.id, { onDelete: "cascade" }),
+      .references(() => homes.id, { onDelete: "cascade", onUpdate: "cascade" }),
     kind: mediaKind("kind").notNull(),
     state: mediaState("state").notNull().default("pending"),
     storageKey: text("storage_key").notNull(),
@@ -148,14 +154,21 @@ export const posts = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     boardId: uuid("board_id")
       .notNull()
-      .references(() => boards.id, { onDelete: "cascade" }),
+      .references(() => boards.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     creatorUserId: uuid("creator_user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
     kind: postKind("kind").notNull(),
     textContent: text("text_content"),
     mediaAssetId: uuid("media_asset_id").references(() => mediaAssets.id, {
       onDelete: "restrict",
+      onUpdate: "cascade",
     }),
     foregroundColor: text("foreground_color").notNull().default("#2a2118"),
     backgroundColor: text("background_color").notNull().default("#ffe890"),

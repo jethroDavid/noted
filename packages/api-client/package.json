@@ -1,0 +1,19 @@
+{
+  "name": "@noted/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noted/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@noted/typescript-config": "workspace:*",
+    "typescript": "5.9.3"
+  }
+}

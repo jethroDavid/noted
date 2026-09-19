@@ -5,9 +5,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["pg"],
   transpilePackages: [
     "@noted/contracts",
+    "@noted/api-client",
     "@noted/database",
     "@noted/domain",
     "@noted/fridge-ui",
+    "@noted/server",
   ],
 };
 

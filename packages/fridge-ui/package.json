@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@noted/contracts": "workspace:*",
     "@noted/domain": "workspace:*",
     "@react-three/fiber": "9.7.0",
     "three": "0.186.0"

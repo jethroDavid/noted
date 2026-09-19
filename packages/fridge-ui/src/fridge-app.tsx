@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   clampPosition,
   createPost,
@@ -22,7 +22,21 @@ import {
 } from "./models";
 import { ModelPicker } from "./model-picker";
 
-export function FridgeApp({ assets }: { assets: FridgeAssets }) {
+export function FridgeApp({
+  assets,
+  homeName = "Playground",
+  headerAction,
+  notice,
+  isPlayground = true,
+  brandHref = "/",
+}: {
+  assets: FridgeAssets;
+  homeName?: string;
+  headerAction?: ReactNode;
+  notice?: string | null;
+  isPlayground?: boolean;
+  brandHref?: string;
+}) {
   const [posts, setPosts] = useState<Post[]>(fixturePosts);
   const [modelId, setModelId] = useState<FridgeModelId>(DEFAULT_FRIDGE_MODEL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -107,7 +121,7 @@ export function FridgeApp({ assets }: { assets: FridgeAssets }) {
   return (
     <div className="noted-app app-shell">
       <header className="app-header">
-        <a className="wordmark" href="/" aria-label="Noted home">
+        <a className="wordmark" href={brandHref} aria-label="Noted home">
           <span className="brand-mark" aria-hidden="true">
             <i />
             <i />
@@ -116,8 +130,11 @@ export function FridgeApp({ assets }: { assets: FridgeAssets }) {
           noted<span className="brand-dot">.</span>
         </a>
         <span className="home-label">
-          <Icon name="home" size={17} /> The Sunday home
+          <Icon name="home" size={17} /> {homeName}
         </span>
+        {headerAction && (
+          <div className="app-header-action">{headerAction}</div>
+        )}
         <button
           className="icon-button help-button"
           aria-label={showHelp ? "Hide fridge help" : "Show fridge help"}
@@ -127,9 +144,16 @@ export function FridgeApp({ assets }: { assets: FridgeAssets }) {
           <Icon name="help" />
         </button>
       </header>
+      {notice && (
+        <p className="app-notice" role="alert">
+          {notice}
+        </p>
+      )}
       <main className="kitchen">
         <section className="workspace-heading" aria-labelledby="page-title">
-          <p className="eyebrow">Our shared space</p>
+          <p className="eyebrow">
+            {isPlayground ? "Try the fridge" : "Our shared space"}
+          </p>
           <h1 id="page-title">
             On the fridge<span>.</span>
           </h1>
@@ -252,7 +276,11 @@ export function FridgeApp({ assets }: { assets: FridgeAssets }) {
         <span>
           <i /> A little space for your people.
         </span>
-        <span>Playground · Changes reset on refresh</span>
+        <span>
+          {isPlayground
+            ? "Playground · Changes reset on refresh"
+            : "Home preview · Posts reset on refresh until Phase 5"}
+        </span>
       </footer>
       {showHelp && (
         <aside className="help-panel" aria-label="Fridge help">
@@ -266,8 +294,8 @@ export function FridgeApp({ assets }: { assets: FridgeAssets }) {
             to close.
           </p>
           <p>
-            Removed posts stay grey for one hour. Open one to undo. This
-            playground resets when you refresh.
+            Removed posts stay grey for one hour. Open one to undo. Posts reset
+            when you refresh this preview.
           </p>
           {sceneUnavailable && (
             <p>
