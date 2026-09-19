@@ -10,9 +10,17 @@ export default defineConfig([
       "@next/next/no-html-link-for-pages": "off",
     },
   },
+  {
+    files: ["packages/fridge-ui/**/*.{ts,tsx}"],
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
   globalIgnores([
     "**/.next/**",
     "**/coverage/**",
+    "test-results/**",
+    "playwright-report/**",
     "**/dist/**",
     "**/node_modules/**",
     ".local/**",

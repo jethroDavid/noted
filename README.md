@@ -1,8 +1,32 @@
 # Noted
 
-Noted is a shared family fridge for text notes, photos, and voice messages. The project starts as a Next.js web app and will later add Electron desktop and Expo mobile clients around shared application rules and API contracts.
+Noted is a shared family fridge for text notes, photos, and voice messages. Next.js is the first platform shell and the initial HTTP backend. The React fridge lives in a shared package that future Electron desktop and Capacitor mobile clients will compile into their own applications.
 
-Phase 1 establishes the local development foundation. See [PLAN.md](./PLAN.md) for the product decisions and the full phase roadmap.
+Phases 2 and 3 implement the interactive fridge playground and its shared frontend boundary. See [PLAN.md](./PLAN.md) for the product decisions and the full phase roadmap.
+
+## Try the fridge
+
+Run `pnpm dev` and open [localhost:3000](http://localhost:3000). The Phase 2 playground works without starting PostgreSQL. Drag a post to move it; click or tap to open its modal. The toolbar creates text notes or adds sample photo/voice cards. Use Tab, arrow keys, and Enter for keyboard interaction.
+
+Changes are temporary and reset on refresh. Removing a post greys it out for exactly one hour, with Undo available by opening that post. Identity begins in Phase 4, shared persistence comes in Phase 5, and uploads/recording come in Phase 6. The 3D scene has a usable simple-view fallback.
+
+The palette button at the fridge's upper right switches between Sage classic, Butter retro, and Blue duo. Switching keeps notes and their positions; the choice resets on refresh. See [fridge models](./docs/design/fridge-models.md) for the model structure and how to add a design.
+
+The [interaction decision](./docs/decisions/0002-fridge-interaction.md) describes rendering, coordinates, layer order, and the remaining physical-phone review.
+
+Posts can move across almost the whole fridge front, including the upper door and near the edges. The fridge retains its original size, with tools below. Text, photo, and voice each have separate card and modal components in `packages/fridge-ui/src/posts` and `packages/fridge-ui/src/modals`. They share the card interaction wrapper and `PostModalFrame` template.
+
+## Browser checks
+
+```powershell
+pnpm exec playwright install chromium
+pnpm build
+pnpm test:browser
+```
+
+The tests start their own production server on port 3100 and cover desktop and emulated touch. `pnpm check` includes the focused unit tests; browser tests run separately. If a managed browser already exists locally, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select its executable. This machine uses a cached Chromium installation because the matching browser download timed out. CI installs Playwright's matching Chromium.
+
+Physical phone validation remains pending. Test card dragging, scrolling, modal editing with the virtual keyboard, and sample audio on an actual phone before treating touch support as device-verified.
 
 ## Prerequisites
 
@@ -73,15 +97,18 @@ The official PostgreSQL image initializes volume ownership before switching to i
 
 ## Workspace boundaries
 
+Icon additions and redesigns follow the [icon design guidelines](./docs/design/icons.md), which document the current interface and brand styles and include reusable prompts. Repository-wide instructions in [AGENTS.md](./AGENTS.md) point agents to this guide.
+
 ```text
-apps/web              Next.js browser app and HTTP routes
+apps/web              Next.js platform shell, public assets, and HTTP routes
+packages/fridge-ui    Shared React UI, Three.js scene, interactions, and styles
 packages/contracts    Public API schemas and types
 packages/domain       Pure rules shared by future clients and services
 packages/database     Server-only Drizzle schema, migrations, pool, and seed
 packages/config       Shared TypeScript configuration
 ```
 
-Browser and future desktop/mobile code may use `contracts` and `domain`. Database code stays server-side. More packages are added only when a phase gives them a real responsibility.
+The web shell renders `fridge-ui` and supplies its platform asset locations. Future Electron and Capacitor shells will compile the same package. Browser and future desktop/mobile code may use `fridge-ui`, `contracts`, and `domain`; the shared API client arrives with the first real HTTP operations in Phase 4. Database code stays server-side.
 
 ## Database changes
 
@@ -98,4 +125,4 @@ Application code uses a small `pg` connection pool. Local development connects t
 - If PostgreSQL does not start, open Docker Desktop and confirm it is using Linux containers.
 - Noted uses host port `55432` for PostgreSQL to avoid common conflicts with other local databases. If port `55432` or `3000` is occupied, stop the conflicting process or deliberately update `.env`.
 - If database commands report a missing URL, run `pnpm local:setup` and review `.env`.
-- Real Google sign-in will use a Firebase project in Phase 3. Local web development will connect to that online authentication service once configured.
+- Real Google sign-in will use a Firebase project in Phase 4. Local web development will connect to that online authentication service once configured.

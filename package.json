@@ -23,11 +23,13 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
+    "test:browser": "playwright test",
     "build": "pnpm --filter @noted/web build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
+    "@playwright/test": "1.63.0",
     "@types/node": "22.20.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.5",

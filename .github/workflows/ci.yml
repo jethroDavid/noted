@@ -56,3 +56,9 @@ jobs:
 
       - name: Verify project
         run: pnpm check
+
+      - name: Install browser for interaction checks
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify fridge interactions
+        run: pnpm test:browser

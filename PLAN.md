@@ -1,12 +1,12 @@
 # Noted: product and implementation plan
 
-Updated: 2026-09-16
+Updated: 2026-09-18
 
-Status: planning baseline. No application has been implemented. This document records the agreed vision and proposes implementation defaults where the conversation left details open. Build one phase at a time and review the working result before extending it.
+Status: active implementation. Phases 0-3 are complete; the Phase 2 prototype still needs physical-device review. Phase 3 established the shared frontend boundary before authentication or persistence work begins. This document records the agreed vision and implementation defaults. Build one phase at a time and review the working result before extending it.
 
 ## Start here: phase-by-phase roadmap
 
-**Current progress:** Phases 0 and 1 are complete. **Next: Phase 2.**
+**Current progress:** Phases 0-3 are complete. The fridge now runs from a shared React package through the Next.js shell, with desktop and emulated-touch checks. **Next: Phase 4 introduces identity, homes, invitations, and the first real shared API client.** Physical-phone review from Phase 2 remains open.
 
 Each phase has its own task checklist and completion criteria in [the detailed phase plans](#11-phased-delivery). Complete and review one working milestone before moving to the next. Check off tasks only after implementation and verification.
 
@@ -14,27 +14,28 @@ Each phase has its own task checklist and completion criteria in [the detailed p
 | --- | --- | --- | --- |
 | 0 | Product and architecture plan | This document | Documented |
 | 1 | Monorepo and local foundation | Next.js, local PostgreSQL, Drizzle, migrations, and checks run together | Complete |
-| 2 | 3D fridge and touch interaction | Move fixture posts and edit through modals on desktop and phone layouts | Not started |
-| 3 | Identity, homes, and invitations | Invited users automatically see their homes | Not started |
-| 4 | Persistent shared text notes | Two users share notes, positions, polling, and one-hour removal with Undo | Not started |
-| 5 | Images and voice notes | Complete local alpha-alpha prototype | Not started |
-| 6 | First deployment | Hosted web app using Neon, real Google sign-in, and private media storage | Not started |
-| 7A | WebSockets | Members see saved changes without waiting for a poll | Later |
-| 7B | Redis coordination | Changes reach members connected to different realtime instances | Later |
-| 7C | Caching | A measured improvement with correct invalidation and access checks | Later |
-| 7D | Queue and worker | Reliable background cleanup with retries | Later |
-| 8 | Electron desktop | Installable desktop app using the shared backend | Later |
-| 9 | Expo mobile | Device-tested mobile app using the shared backend | Later |
-| 10 | Real-world map, then additional rooms | Public home discovery with private fridge access | Later |
-| 11 | Family activities | One chosen chat, game, or activity experience at a time | Optional |
+| 2 | 3D fridge and touch interaction | Move fixture posts and edit through modals on desktop and phone layouts | Implemented; physical-phone review pending |
+| 3 | Shared frontend foundation | Next.js renders the fridge from a reusable React package | Complete |
+| 4 | Identity, homes, and invitations | Invited users automatically see their homes through the first shared API client | Not started |
+| 5 | Persistent shared text notes | Two users share notes, positions, polling, and one-hour removal with Undo | Not started |
+| 6 | Images and voice notes | Complete local alpha-alpha prototype | Not started |
+| 7 | First deployment | Hosted web app using Neon, real Google sign-in, and private media storage | Not started |
+| 8A | WebSockets | Members see saved changes without waiting for a poll | Later |
+| 8B | Redis coordination | Changes reach members connected to different realtime instances | Later |
+| 8C | Caching | A measured improvement with correct invalidation and access checks | Later |
+| 8D | Queue and worker | Reliable background cleanup with retries | Later |
+| 9 | Electron desktop | Installable desktop app using the shared React frontend and backend | Later |
+| 10 | Capacitor mobile | Device-tested mobile app using the shared React frontend and backend | Later |
+| 11 | Real-world map, then additional rooms | Public home discovery with private fridge access | Later |
+| 12 | Family activities | One chosen chat, game, or activity experience at a time | Optional |
 
-**First finish line: Phase 5.** Phases 1-5 deliver the simple, usable local product. Backend learning and other platforms follow that milestone. Phase 6 is the deployment checkpoint; its timing can move if we want to continue learning locally before paying for hosting.
+**First finish line: Phase 6.** Phases 1-6 deliver the simple, usable local product. Phase 3 is an intentional architecture milestone rather than a new product feature. Backend learning and other platforms follow the alpha-alpha milestone. Phase 7 is the deployment checkpoint; its timing can move if we want to continue learning locally before paying for hosting.
 
 ## 1. Product vision
 
 A shared home with a refrigerator covered in notes, photographs, and voice messages. Members leave small everyday messages, move things around, and enjoy a space that feels personal and playful.
 
-The first app is a browser experience built with Next.js. It is also a portfolio and learning project: establish a simple working foundation, improve the backend through concrete features, then add Electron desktop and Expo mobile applications. Shared rooms, a real-world neighborhood map, chat, and family activities are longer-term possibilities.
+The first app is a browser experience built with Next.js. It is also a portfolio and learning project: establish a reusable React frontend and a simple working foundation, improve the backend through concrete features, then add Electron desktop and Capacitor mobile applications around that same frontend. Shared rooms, a real-world neighborhood map, chat, and family activities are longer-term possibilities.
 
 The refrigerator is visible directly after entering a home. There is no door-opening interaction. Start in 3D, viewed mostly from the front with a little depth. Keep the composition warm, readable, and casual rather than visually busy.
 
@@ -44,7 +45,7 @@ Noted is the repository name. The public product name is undecided.
 
 | Area | Decision |
 | --- | --- |
-| Repository | Monorepo; web first, prepared for Electron and Expo |
+| Repository | Monorepo; web first, with the React frontend shared from the beginning for Electron and Capacitor |
 | Web | Next.js with TypeScript |
 | Data | PostgreSQL, Drizzle ORM, Neon when deployed |
 | Development | Local database and local media; Firebase Authentication is online once identity work begins |
@@ -82,8 +83,8 @@ These are adjustable starting choices, not additional requirements from the user
 
 - Use pnpm workspaces, one lockfile, and a pinned package-manager version. Use workspace scripts initially; introduce a task orchestrator only when it solves an actual coordination problem.
 - Use the Next.js App Router and Node.js server runtime for database, authentication verification, and local file access.
-- Use Three.js through React Three Fiber for the web fridge. Verify compatible stable React, Next.js, Three.js, Fiber, and Expo versions when scaffolding; do not select preview releases by default.
-- Use a real Firebase project for Google sign-in during local development when identity work begins in Phase 3.
+- Use Three.js through React Three Fiber for the shared web-based fridge. Verify it in Next.js, Electron's renderer, and Capacitor's WebView when those shells are added; do not select preview releases by default.
+- Use a real Firebase project for Google sign-in during local development when identity work begins in Phase 4.
 - Use local PostgreSQL through Docker Compose and a persistent volume. Check Docker availability before setup; a native local PostgreSQL installation is an acceptable fallback.
 - Use one process-level `pg` connection pool with Drizzle's node-postgres adapter. No Redis or local PgBouncer service initially.
 - Store uploads in a private local directory in development, behind an application storage interface. Select deployed object storage during deployment planning.
@@ -110,7 +111,7 @@ These are adjustable starting choices, not additional requirements from the user
 
 Local PostgreSQL is fully compatible with this approach. It does not need to emulate Neon's infrastructure. Keep to ordinary PostgreSQL features, align supported database versions, and apply the same checked-in migrations to each environment. Test migrations and application behavior against Neon before declaring a deployment ready.
 
-Phases 1 and 2 do not require a Firebase project. Starting in Phase 3, local development uses the real online Firebase Authentication service and real Google accounts. Keep PostgreSQL and media local until deployment. Bundle fonts and 3D assets locally. The future map may use online map tiles; offline tile support is not part of the alpha.
+Phases 1-3 do not require a Firebase project. Starting in Phase 4, local development uses the real online Firebase Authentication service and real Google accounts. Keep PostgreSQL and media local until deployment. Bundle fonts and 3D assets locally. The future map may use online map tiles; offline tile support is not part of the alpha.
 
 Phone testing needs a reachable development origin. Camera/microphone and authentication behavior must be tested over a suitable secure origin; ordinary HTTP at a computer's LAN address is not equivalent to localhost on that phone. Plan a local HTTPS certificate and device trust setup when testing on physical phones.
 
@@ -138,15 +139,16 @@ noted/
   .gitignore
   compose.yaml                      # local PostgreSQL initially
   apps/
-    web/                            # Next.js UI, HTTP routes, web 3D scene
-    desktop/                        # future Electron shell
-    mobile/                         # future Expo application
+    web/                            # Next.js shell, HTTP routes, and backend runtime
+    desktop/                        # future Electron shell and preload boundary
+    mobile/                         # future Capacitor shell and native projects
     realtime/                       # future persistent WebSocket service
     worker/                         # future background job runner
   packages/
+    fridge-ui/                      # shared React UI, 3D scene, interactions, and styles
     contracts/                      # request/response schemas and public types
     domain/                         # pure rules and shared constants
-    api-client/                     # typed HTTP calls; token provider injected
+    api-client/                     # typed HTTP calls, introduced with the first real API
     database/                       # server-only Drizzle schema, migrations, pg pool
     server/                         # use cases, membership checks, auth/storage adapters
     config/                         # shared TypeScript/lint configuration
@@ -156,20 +158,26 @@ noted/
   .local/                           # ignored local uploads
 ```
 
-Create a package when it contains real responsibilities. In phase 1, establish workspaces and core configuration; populate the domain, contracts, database, server, and API-client packages as their first features arrive. Keep web UI and scene code in `apps/web` until genuine reuse warrants extraction.
+Create a package when it contains real responsibilities. The completed fridge prototype makes the frontend boundary concrete, so Phase 3 extracts it into `packages/fridge-ui` before more features are added. The package contains the existing React UI, 3D scene, interaction code, tests, and scoped styles. `apps/web` remains the Next.js route and platform shell that renders that package.
+
+Phase 3 does not invent backend traffic merely to populate `api-client`. Phase 4 introduces `contracts`, `api-client`, and server operations together around the first real identity/home HTTP endpoints. From that point forward, the web frontend uses the same API client that Electron and Capacitor will use later.
 
 ### Dependency rules
 
-- Browser, desktop renderer, and mobile code may use `contracts`, `domain`, and `api-client`.
+- The Next.js web shell, Electron renderer, and Capacitor application render `fridge-ui`; they do not maintain copies of the fridge interface.
+- `fridge-ui` is a React DOM package. It may use browser standards and React Three Fiber, but it must not import Next.js, Electron, Capacitor, database, or privileged server modules.
+- Platform shells provide asset locations and, when needed, small capability adapters for operations such as choosing a photo or recording audio.
+- Browser, desktop renderer, and mobile code may use `fridge-ui`, `contracts`, `domain`, and `api-client`.
 - They must never import `database`, privileged authentication code, filesystem storage, or server secrets.
 - `domain` contains pure rules with no Next.js, DOM, database, or Firebase dependency.
 - `contracts` describes API payloads rather than exposing database rows as the public contract.
 - Next.js routes call application services in `server`; those services call `database` and storage/auth adapters.
 - Server Components can call the same services directly. Do not make them call the app's own HTTP routes unnecessarily.
-- Use HTTP endpoints for shared client operations so Expo and Electron are not coupled to Next.js Server Actions.
-- Expo can reuse data access and rules. Native navigation, modal UI, recording, touch, and parts of 3D presentation need platform work.
-- Electron's renderer can reuse web presentation. Packaging, authentication callbacks, updates, and OS integration remain separate work.
-- Reserve a decision for the desktop phase: package a renderer or load the hosted web app. Do not embed database credentials or start a duplicate backend inside Electron.
+- Use HTTP endpoints for shared client operations so Capacitor and Electron are not coupled to Next.js Server Actions.
+- `api-client` is client-side request code, not another backend. It sends authenticated HTTP requests to the backend hosted by `apps/web` and never receives database credentials.
+- Capacitor compiles the shared React frontend into its web bundle. The mobile shell owns Capacitor configuration, iOS/Android projects, permissions, and plugin adapters.
+- Electron packages a renderer that imports the shared React frontend. The desktop shell owns its main process, preload boundary, window lifecycle, authentication callbacks, updates, and packaging.
+- Next.js remains the single HTTP backend initially. Later realtime and worker applications may become separate processes only when their phases require them.
 
 ## 6. Data model
 
@@ -312,7 +320,7 @@ Each phase ends with a visible demonstration and focused checks. The user can pa
 4. Demonstrate the exit criteria, then check off completed tasks and update the roadmap status.
 5. Record unresolved issues before starting the next phase. A phase is not complete just because its code exists.
 
-Phases 1-5 build on one another in order. Later phases use the completed web foundation; desktop, mobile, and the map do not technically require every backend experiment to be finished, although the intended learning order is listed above.
+Phases 1-6 build on one another in order. Later phases use the completed shared frontend and web backend; desktop, mobile, and the map do not technically require every backend experiment to be finished, although the intended learning order is listed above.
 
 ### Phase 0 - Align and document
 
@@ -327,26 +335,47 @@ Exit: a clear first build scope, local development strategy, monorepo boundaries
 ### Phase 1 - Repository and local foundation
 
 - [x] Establish pnpm workspaces, TypeScript, formatting/linting, and the Next.js app.
-- [x] Configure local PostgreSQL and ignored local media storage; reserve documented Firebase environment variables for Phase 3.
+- [x] Configure local PostgreSQL and ignored local media storage; reserve documented Firebase environment variables for Phase 4.
 - [x] Add Drizzle configuration, the first migrations, and deterministic sample users/home data as the related tables arrive.
 - [x] Provide startup, shutdown, database migration, seed, test, and check scripts. Document Windows prerequisites and ports.
 - [x] Add a minimal CI path for typechecking, linting, focused tests, and build; runtime checks use disposable local services.
-- [x] Create no Expo/Electron runtime or Redis/worker service yet.
+- [x] Create no Capacitor/Electron runtime or Redis/worker service yet.
 
 Exit: a fresh checkout can start the local website and PostgreSQL following the README, persist data across restarts, and run migrations against an empty database without cloud credentials. Authentication is not implemented in this phase.
 
 ### Phase 2 - 3D fridge and touch prototype
 
-- [ ] Build the front-facing 3D fridge with local fixture posts.
-- [ ] Add local selection, modal editing, text colors, dragging, creation layers, and greyed-out appearance.
-- [ ] Validate mouse, touch, keyboard, small-screen modal layout, and camera framing.
-- [ ] Establish the coordinate conversion and selection-layer rules before persistence.
+- [x] Build the front-facing 3D fridge with local fixture posts.
+- [x] Add local selection, modal editing, text colors, dragging, creation layers, and greyed-out appearance.
+- [x] Validate mouse, emulated touch, keyboard, small-screen modal layout, and camera framing.
+- [x] Establish the coordinate conversion and selection-layer rules before persistence.
+- [ ] Complete physical-phone testing of dragging, scrolling, the virtual keyboard, and sample audio; review the visual direction with the user.
+
+Implementation notes and validation boundaries are recorded in [the fridge interaction decision](docs/decisions/0002-fridge-interaction.md). The prototype includes local one-hour removal/Undo/expiry; server-authoritative shared behavior remains Phase 5.
+
+Verified: formatting, lint, TypeScript, 12 unit tests, production build, and 14 browser checks passed. Desktop and phone-sized layouts were also inspected visually. Browser verification used Chromium 149.0.7827.55 with software rendering; physical-device and Safari checks remain pending.
 
 Exit: manipulate example text, photo, and voice-card fixtures on laptop and phone layouts. Fixture state is explicitly temporary; persistent multi-user behavior comes next.
 
-### Phase 3 - Identity, homes, and invitations
+### Phase 3 - Shared frontend foundation
+
+- [x] Create `packages/fridge-ui` as a real workspace package consumed by `apps/web`.
+- [x] Move the existing fridge React components, Three.js scene, interaction rules, focused tests, and component styles into the package without redesigning the interface.
+- [x] Remove Next.js imports and hard-coded Next.js public-asset assumptions from the shared package. Pass asset locations through the web wrapper.
+- [x] Keep the App Router page, layout, fonts, metadata, public fixtures, HTTP routes, and server-only code in `apps/web`.
+- [x] Scope shared styles to the fridge application so future platform shells can import them without changing unrelated pages.
+- [x] Preserve mouse, touch, keyboard, modal, removal, fallback, and responsive behavior through the extraction.
+- [x] Document the platform boundary: Next.js renders the package now; Electron and Capacitor will compile the same React source later and provide native capability adapters when real native features arrive.
+- [x] Do not add authentication, persistent post APIs, an API-client package, Electron, Capacitor, or placeholder native interfaces in this phase.
+
+Verified on 2026-09-18: the package and web app typecheck independently, 12 unit tests pass, the production build succeeds, all 14 desktop/emulated-touch browser checks pass, and the desktop layout was visually reviewed through the running Next.js app. The shared package contains no Next.js, Electron, Capacitor, database, or privileged server import.
+
+Exit: the existing Next.js site looks and behaves the same, but its page renders `@noted/fridge-ui`. The shared package has no Next.js, Electron, Capacitor, database, or server-secret dependency and passes the existing focused and browser checks.
+
+### Phase 4 - Identity, homes, and invitations
 
 - [ ] Configure a real Firebase project, connect Google sign-in, and verify Firebase identity tokens on the server.
+- [ ] Introduce shared request/response contracts and `packages/api-client` around these first real HTTP operations; make the web frontend use that client.
 - [ ] Implement creating/listing homes, creator-only invitations and rename/removal controls, and ordinary member departure.
 - [ ] Create the initial fridge board with each new home in one transaction.
 - [ ] Support both existing-user invitations and invitations claimed on first matching sign-in.
@@ -354,7 +383,7 @@ Exit: manipulate example text, photo, and voice-card fixtures on laptop and phon
 
 Exit: Alice creates a home, invites Bob, and Bob sees it without accepting. Carol cannot read it. Bob can leave; the creator cannot leave through either UI or API.
 
-### Phase 4 - Persistent shared text notes
+### Phase 5 - Persistent shared text notes
 
 - [ ] Connect the 3D scene to the HTTP API and local database.
 - [ ] Implement create/edit, shared movement, newest-on-top order, local selection, and last-save-wins saves.
@@ -363,7 +392,7 @@ Exit: Alice creates a home, invites Bob, and Bob sees it without accepting. Caro
 
 Exit: two browser sessions see each other's saved notes and moves through polling. Reload preserves positions. Concurrent saves follow the chosen rule. Expiry and Undo work without a worker.
 
-### Phase 5 - Images and voice; alpha-alpha complete
+### Phase 6 - Images and voice; alpha-alpha complete
 
 - [ ] Implement photo upload and display without captions.
 - [ ] Implement recording, preview, playback, stop/cancel, and one-minute limit.
@@ -373,7 +402,7 @@ Exit: two browser sessions see each other's saved notes and moves through pollin
 
 Exit: the complete local alpha-alpha supports real Google identity through Firebase, automatic invitations, text/photo/voice posts, touch/mouse movement, polling, and slow removal. No Redis, realtime server, cache layer, or job queue is required.
 
-### Phase 6 - First deployment and portfolio demonstration
+### Phase 7 - First deployment and portfolio demonstration
 
 - [ ] Choose hosting, media storage, budget, and a provisional display name.
 - [ ] Configure Neon with pooled application connections and tested migrations.
@@ -384,9 +413,9 @@ Exit: the complete local alpha-alpha supports real Google identity through Fireb
 
 Exit: a working hosted web prototype, with costs understood and deployment/recovery instructions. Deployment is a separate action from writing this plan; no services are provisioned here.
 
-### Phase 7 - Backend learning, one capability at a time
+### Phase 8 - Backend learning, one capability at a time
 
-#### 7A. WebSockets
+#### 8A. WebSockets
 
 Use saved post changes as the first event. Keep HTTP writes and add push notifications that refresh the relevant fridge. Compare against polling, then retain a reconnect/resync fallback. Choose a host that supports persistent connections; do not assume ordinary serverless route invocations can host the socket service.
 
@@ -397,7 +426,7 @@ Use saved post changes as the first event. Keep HTTP writes and add push notific
 
 Exit: authorized members receive updates, removed members lose access, and reconnects recover missed changes.
 
-#### 7B. Redis coordination
+#### 8B. Redis coordination
 
 Add Redis when running multiple realtime instances. Publish changes so members connected to different instances see the same events. Redis Pub/Sub is transient; PostgreSQL remains authoritative and reconnecting clients refetch state.
 
@@ -407,7 +436,7 @@ Add Redis when running multiple realtime instances. Publish changes so members c
 
 Exit: a two-instance demonstration works and restarting Redis does not lose saved notes.
 
-#### 7C. Caching
+#### 8C. Caching
 
 Measure a repeated read first, then cache an appropriate result with a clear home-scoped key, TTL, and invalidation policy. Membership checks remain current. Do not serve expired posts just because an old board snapshot is cached; account for the nearest removal deadline.
 
@@ -418,7 +447,7 @@ Measure a repeated read first, then cache an appropriate result with a clear hom
 
 Exit: demonstrate a measured benefit, correct invalidation, no cross-home data exposure, and correct slow-removal behavior.
 
-#### 7D. Queue and worker
+#### 8D. Queue and worker
 
 Move physical expired-media cleanup into a background job. Add thumbnail generation only if useful. Use retryable, idempotent work and recheck the post state before deleting media: an Undo can invalidate a previously queued cleanup job.
 
@@ -429,23 +458,24 @@ Move physical expired-media cleanup into a background job. Add thumbnail generat
 
 Exit: jobs survive restarts, retries do not damage live data, and failures are visible. Then document each component's role and operational cost.
 
-### Phase 8 - Electron desktop
+### Phase 9 - Electron desktop
 
-- [ ] Choose hosted versus packaged renderer and test the existing shared API client and contracts.
+- [ ] Create a packaged renderer that imports `fridge-ui`, `api-client`, `contracts`, and `domain` instead of copying frontend code.
 - [ ] Implement desktop authentication callback handling, window behavior, recording permissions, and packaging.
 - [ ] Keep the renderer isolated from privileged OS APIs; expose only required operations through the preload boundary.
 
 Exit: an installable desktop app uses the same homes and posts, with no local database credentials embedded in the app.
 
-### Phase 9 - Expo mobile
+### Phase 10 - Capacitor mobile
 
-- [ ] Bootstrap against the existing monorepo and shared contracts/domain/API client.
-- [ ] Implement native navigation, authentication, media picker, recording, and suitable 3D/touch presentation.
-- [ ] Validate dependency compatibility before attempting scene-code reuse. Share pure math/assets where useful; do not force browser-only components into native UI.
+- [ ] Create a Capacitor application that imports `fridge-ui`, `api-client`, `contracts`, and `domain` instead of copying frontend code.
+- [ ] Configure the web bundle, iOS/Android projects, authentication callbacks, permissions, media picker, and recording plugins.
+- [ ] Connect native operations through small capability adapters while keeping ordinary React UI and browser-standard behavior inside `fridge-ui`.
+- [ ] Test the shared Three.js scene, touch behavior, modal layout, camera/microphone flows, and performance in real iOS and Android WebViews.
 
 Exit: a device-tested mobile app uses the same backend and product rules. Offline synchronization and push notifications remain separate later features.
 
-### Phase 10 - Map and expanded home
+### Phase 11 - Map and expanded home
 
 - [ ] Implement the real-world map behavior described below.
 - [ ] Add rooms only when there is a concrete second room experience.
@@ -453,7 +483,7 @@ Exit: a device-tested mobile app uses the same backend and product rules. Offlin
 
 Exit: map discovery reveals only the intended public home information, members can enter their own homes, and the original fridge remains usable independently of location permission.
 
-### Phase 11 - Optional family activities
+### Phase 12 - Optional family activities
 
 Explore chat, small games, shared activities, or richer personalization only while the project remains enjoyable. Choose one real interaction to design before adding its data model or infrastructure. These are ideas, not commitments for the prototype.
 
@@ -510,12 +540,13 @@ Focus tests on product behavior and boundaries rather than mirroring every imple
 - Multi-session browser checks: shared positions, locally raised selection, polling, stale responses, and membership revocation.
 - Media checks: invalid/oversized content, duration, canceled upload, recorder permissions, playback, and expiry.
 - Visual/interaction checks on desktop and touch: tap versus drag, overlapping cards, small-screen modal layout, focus, and render failure behavior.
-- Typecheck, lint, focused tests, and production build for each relevant implementation milestone. No application checks can run in the current documentation-only phase.
+- Shared-frontend boundary checks in Phase 3: `fridge-ui` typechecks independently, imports no platform/server modules, and the existing web browser checks pass through the package entry point.
+- Typecheck, lint, focused tests, and production build for each relevant implementation milestone. Phase 2 also has production-browser checks for desktop and emulated touch.
 - A real-device pass is required before claiming phone recording and touch support work; viewport emulation alone is insufficient.
 
 ## 14. Scope discipline and remaining choices
 
-The alpha-alpha ends at phase 5. It does not include map discovery, extra rooms, Electron, Expo, WebSockets, Redis, caching infrastructure, queues, workers, chat, or games.
+The alpha-alpha ends at Phase 6. It does not include map discovery, extra rooms, Electron, Capacitor, WebSockets, Redis, caching infrastructure, queues, workers, chat, or games.
 
 Prepared architecture means explicit shared contracts and runtime boundaries. It cannot remove future platform setup, OAuth registration, mobile build requirements, desktop packaging, or hosting decisions.
 
@@ -525,13 +556,13 @@ Still adjustable without reopening the product vision:
 - Package versions, PostgreSQL version, device test targets, and local Docker/native setup based on the development machine.
 - Hosting provider, object storage provider, deployment budget, and public product name.
 - Map accuracy margin/cutoff and permission fallback, to confirm in the map phase.
-- Electron renderer packaging approach and Expo-specific rendering choices, in their respective phases.
+- Electron build/distribution details and the exact Capacitor plugins and native project configuration, in their respective phases.
 
 Keep the working product useful at every milestone. Introduce each later backend technology with a concrete feature, a verification example, and an explanation of why it exists.
 
 ## 15. Technical references
 
-Checked during planning on 2026-09-16. Recheck version-dependent setup when implementing.
+Initially checked during planning on 2026-09-16; the Capacitor/Electron frontend boundary was confirmed on 2026-09-17. Recheck version-dependent setup when implementing.
 
 - [Drizzle with PostgreSQL and node-postgres](https://orm.drizzle.team/docs/get-started/postgresql-new) - local and hosted PostgreSQL access through the same driver family.
 - [Drizzle migrations](https://orm.drizzle.team/docs/migrations) - checked-in schema changes.
@@ -539,5 +570,7 @@ Checked during planning on 2026-09-16. Recheck version-dependent setup when impl
 - [Firebase Google sign-in](https://firebase.google.com/docs/auth/web/google-signin) - real Google identity in local and deployed environments.
 - [Firebase ID token verification](https://firebase.google.com/docs/auth/admin/verify-id-tokens) - server-side identity verification.
 - [React Three Fiber introduction](https://r3f.docs.pmnd.rs/) - React integration and version compatibility considerations.
+- [Capacitor documentation](https://capacitorjs.com/docs) - adding a native runtime and plugin APIs to an existing modern web application.
+- [Electron process model](https://www.electronjs.org/docs/latest/tutorial/process-model) - web-based renderers plus isolated main/preload responsibilities.
 - [W3C Geolocation specification](https://www.w3.org/TR/geolocation/) - per-reading location accuracy and device-location behavior.
 - [GPS.gov accuracy guidance](https://www.gps.gov/gps-accuracy) - typical smartphone GPS accuracy in open-sky conditions.
