@@ -2,6 +2,8 @@
 
 Date: 2026-09-16
 
+> Historical record: the Three.js rendering, WebGL fallback, and React/Fiber version pins in "Presentation and runtime" were superseded by [the flat-render decision](./0004-flat-fridge-render.md) and the image-based [fridge illustration](../design/fridge-illustration.md). File paths below predate the `features/` reorganization; see [the frontend architecture](../architecture/frontend.md). Coordinates, layers, card/modal structure, and interaction rules still apply.
+
 ## Presentation and runtime
 
 Phase 2 adds a front-facing Three.js refrigerator using React Three Fiber. The body, doors, handles, and feet are local procedural geometry. No remote model, environment map, or runtime font request is needed. Lighting and the offset casing provide depth with a fixed camera. The scene renders on demand and caps device pixel ratio at 1.5.

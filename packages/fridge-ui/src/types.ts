@@ -6,4 +6,10 @@ export type FridgeAssets = Readonly<{
   sampleAudio: Readonly<{
     src: string;
   }>;
+  kitchenBackdrop?: Readonly<{
+    src: string;
+  }>;
+  fridgeArtwork?: Readonly<{
+    src: string;
+  }>;
 }>;

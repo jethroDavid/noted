@@ -1,6 +1,6 @@
 "use client";
 
-import { FridgeApp, type FridgeAssets } from "@noted/fridge-ui";
+import { FridgeApp } from "@noted/fridge-ui";
 import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -9,17 +9,9 @@ import {
   googleProvider,
   isFirebaseConfigured,
   webAuth,
-} from "@/features/homes/firebase-auth";
-
-const webAssets = {
-  samplePhoto: {
-    src: "/fixtures/lake.jpg",
-    alt: "Mountains reflected in a turquoise lake",
-  },
-  sampleAudio: {
-    src: "/fixtures/dinner.wav",
-  },
-} satisfies FridgeAssets;
+} from "../../platform/auth/firebase-auth";
+import { authErrorMessage } from "../../platform/auth/auth-error";
+import { webFridgeAssets } from "./assets";
 
 export function WebFridge() {
   const router = useRouter();
@@ -37,7 +29,7 @@ export function WebFridge() {
         setAuthReady(true);
       },
       (cause) => {
-        setError(cause.message);
+        setError(authErrorMessage(cause));
         setAuthReady(true);
       },
     );
@@ -47,7 +39,7 @@ export function WebFridge() {
     setError(null);
     if (!isFirebaseConfigured()) {
       setError(
-        "Google sign-in needs Firebase setup before you can open a shared home.",
+        "Shared homes aren't available yet. You can still try the playground.",
       );
       return;
     }
@@ -57,23 +49,32 @@ export function WebFridge() {
       if (!auth.currentUser) await signInWithPopup(auth, googleProvider);
       router.push("/app/homes");
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Sign-in did not finish.",
-      );
+      setError(authErrorMessage(cause));
     } finally {
       setBusy(false);
     }
   }
 
+  let headerLabel = "Sign in";
+  if (busy) {
+    headerLabel = "Opening…";
+  } else if (signedIn) {
+    headerLabel = "Your homes";
+  }
+
   return (
     <FridgeApp
-      assets={webAssets}
+      assets={webFridgeAssets}
       homeName="Playground"
       brandHref="/app"
       notice={error}
       headerAction={
-        <button disabled={busy || !authReady} onClick={() => void openHomes()}>
-          {signedIn ? "Your homes" : "Sign in"}
+        <button
+          className="header-primary"
+          disabled={busy || !authReady}
+          onClick={() => void openHomes()}
+        >
+          {headerLabel}
         </button>
       }
     />

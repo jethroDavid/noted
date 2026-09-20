@@ -30,9 +30,11 @@
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.63.0",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "22.20.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.5",
+    "jsdom": "^30.1.0",
     "prettier": "3.9.7",
     "typescript": "5.9.3",
     "typescript-eslint": "8.70.0",

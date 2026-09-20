@@ -18,6 +18,11 @@ export class ApiError extends Error {
   }
 }
 
+export type ApiRequestOptions = {
+  /** Forwarded to fetch so queries can cancel superseded requests. */
+  signal?: AbortSignal;
+};
+
 export function createApiClient(options: {
   baseUrl?: string;
   getIdToken: () => Promise<string>;
@@ -29,11 +34,13 @@ export function createApiClient(options: {
     schema: Schema<T>,
     method = "GET",
     body?: object,
+    requestOptions?: ApiRequestOptions,
   ): Promise<T> {
     const token = await options.getIdToken();
     const response = await fetch(`${base}/api${path}`, {
       method,
       cache: "no-store",
+      signal: requestOptions?.signal,
       headers: {
         Authorization: `Bearer ${token}`,
         ...(body ? { "Content-Type": "application/json" } : {}),
@@ -57,25 +64,60 @@ export function createApiClient(options: {
   const homePath = (id: string) => `/homes/${encodeURIComponent(id)}`;
 
   return {
-    me: () => request("/me", meResponseSchema),
-    homes: () => request("/homes", homesResponseSchema),
-    createHome: (name: string) =>
-      request("/homes", homeResponseSchema, "POST", { name }),
-    home: (id: string) => request(homePath(id), homeResponseSchema),
-    renameHome: (id: string, name: string) =>
-      request(homePath(id), homeResponseSchema, "PATCH", { name }),
-    invite: (id: string, email: string) =>
-      request(`${homePath(id)}/invitations`, homeResponseSchema, "POST", {
-        email,
-      }),
-    removeMember: (id: string, userId: string) =>
+    me: (requestOptions?: ApiRequestOptions) =>
+      request("/me", meResponseSchema, "GET", undefined, requestOptions),
+    homes: (requestOptions?: ApiRequestOptions) =>
+      request("/homes", homesResponseSchema, "GET", undefined, requestOptions),
+    createHome: (name: string, requestOptions?: ApiRequestOptions) =>
+      request("/homes", homeResponseSchema, "POST", { name }, requestOptions),
+    home: (id: string, requestOptions?: ApiRequestOptions) =>
+      request(
+        homePath(id),
+        homeResponseSchema,
+        "GET",
+        undefined,
+        requestOptions,
+      ),
+    renameHome: (
+      id: string,
+      name: string,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        homePath(id),
+        homeResponseSchema,
+        "PATCH",
+        { name },
+        requestOptions,
+      ),
+    invite: (id: string, email: string, requestOptions?: ApiRequestOptions) =>
+      request(
+        `${homePath(id)}/invitations`,
+        homeResponseSchema,
+        "POST",
+        { email },
+        requestOptions,
+      ),
+    removeMember: (
+      id: string,
+      userId: string,
+      requestOptions?: ApiRequestOptions,
+    ) =>
       request(
         `${homePath(id)}/members/${encodeURIComponent(userId)}`,
         homeResponseSchema,
         "DELETE",
+        undefined,
+        requestOptions,
       ),
-    leaveHome: (id: string) =>
-      request(`${homePath(id)}/membership`, homesResponseSchema, "DELETE"),
+    leaveHome: (id: string, requestOptions?: ApiRequestOptions) =>
+      request(
+        `${homePath(id)}/membership`,
+        homesResponseSchema,
+        "DELETE",
+        undefined,
+        requestOptions,
+      ),
   };
 }
 

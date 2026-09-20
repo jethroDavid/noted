@@ -22,11 +22,11 @@ test("home switcher explains setup or offers Google sign-in", async ({
   await expect(
     page
       .getByText(
-        "Google sign-in needs a Firebase project before shared homes can open.",
+        "Shared homes aren't available yet. You can still try the fridge in the playground.",
       )
       .or(page.getByRole("button", { name: "Continue with Google" })),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Playground ↗", exact: true }).click();
+  await page.getByRole("link", { name: "Playground", exact: true }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(
     page.getByRole("heading", { name: "On the fridge." }),

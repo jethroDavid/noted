@@ -8,7 +8,7 @@ Use this document when adding icons or deliberately changing their visual langua
 
 The interface uses simple, calm outline icons with rounded strokes. Shapes should be recognizable at small sizes and feel at home beside the fridge's soft colors and casual lettering. The icons themselves use clean geometry; the handwritten character comes from the surrounding typography and decoration.
 
-The implementation reference is [icons.tsx](../../packages/fridge-ui/src/icons.tsx). Its shared `Icon` component owns the SVG attributes; individual icons supply their geometry.
+The implementation reference is [icons.tsx](../../packages/fridge-ui/src/ui/icons.tsx). Its shared `Icon` component owns the SVG attributes; individual icons supply their geometry.
 
 | Property             | Current rule                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -32,7 +32,7 @@ Reference examples in `icons.tsx`:
 - `voice`: a rounded microphone capsule and a few supporting lines.
 - `home`: a recognizable roof and doorway with little detail.
 - `help`: a circular enclosure with an uncluttered question mark.
-- `palette`: a curved artist's palette with three small paint circles, used to choose the fridge model.
+- `palette`: a curved artist's palette with three small paint circles. The glyph remains available, but the single-model fridge no longer has an appearance chooser.
 
 Read their actual SVG geometry before drawing a new member of the set. These are examples of the style, not templates that require every icon to contain the same shapes.
 
@@ -53,7 +53,7 @@ The Noted mark is its own family: three filled, softly rounded sage bars with a 
 
 References:
 
-- [fridge-app.tsx](../../packages/fridge-ui/src/fridge-app.tsx): header markup and accessible home link.
+- [brand-link.tsx](../../packages/fridge-ui/src/ui/brand-link.tsx): shared header markup and accessible playground link.
 - [styles.css](../../packages/fridge-ui/src/styles.css): `.brand-mark`, `.wordmark`, and `.brand-dot`.
 - [favicon.svg](../../apps/web/public/favicon.svg): the small square brand asset.
 
@@ -78,7 +78,7 @@ Change the brand only when the user requests brand work. For a brand redesign, r
 
 ### Add an icon in the current style
 
-> Add a [calendar] interface icon for [choosing a date]. Follow `docs/design/icons.md` and compare it with the existing icons in `packages/fridge-ui/src/icons.tsx`. Reuse the shared SVG attributes and preserve the current icon family. Review it at the actual display sizes beside the existing icons and ensure its control has an accessible name.
+> Add a [calendar] interface icon for [choosing a date]. Follow `docs/design/icons.md` and compare it with the existing icons in `packages/fridge-ui/src/ui/icons.tsx`. Reuse the shared SVG attributes and preserve the current icon family. Review it at the actual display sizes beside the existing icons and ensure its control has an accessible name.
 
 ### Redesign the interface icon family
 

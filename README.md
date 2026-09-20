@@ -8,13 +8,15 @@ Phases 2 and 3 implement the interactive fridge playground and its shared fronte
 
 Run `pnpm dev` and open [localhost:3000/app](http://localhost:3000/app). The root URL redirects there. The Phase 2 playground works without starting PostgreSQL. Drag a post to move it; click or tap to open its modal. The toolbar creates text notes or adds sample photo/voice cards. Use Tab, arrow keys, and Enter for keyboard interaction.
 
-Changes are temporary and reset on refresh. Removing a post greys it out for exactly one hour, with Undo available by opening the post. Sign in from the playground to open the [home switcher](http://localhost:3000/app/homes); posts inside shared homes are still playground fixtures until Phase 5. Uploads and recording come in Phase 6. The 3D scene has a usable simple-view fallback.
+Changes are temporary and reset on refresh. Removing a post greys it out for exactly one hour, with Undo available by opening the post. Sign in from the playground to open the [home switcher](http://localhost:3000/app/homes); posts inside shared homes are still playground fixtures until Phase 5. Uploads and recording come in Phase 6. The fridge is a flat illustration, so it renders everywhere HTML does.
 
-The palette button at the fridge's upper right switches between Sage classic, Butter retro, and Blue duo. Switching keeps notes and their positions; the choice resets on refresh. See [fridge models](./docs/design/fridge-models.md) for the model structure and how to add a design.
+The fridge uses painted cream enamel artwork with olive-and-brass handles and a trailing plant, set in a matching sunlit kitchen. Notes stay interactive above the artwork; a local SVG is retained as an image-load fallback. See [fridge illustration](./docs/design/fridge-illustration.md) for the reference and structure.
 
-The [interaction decision](./docs/decisions/0002-fridge-interaction.md) describes rendering, coordinates, layer order, and the remaining physical-phone review.
+The [interaction decision](./docs/decisions/0002-fridge-interaction.md) describes coordinates, layer order, and the remaining physical-phone review; its rendering section is historical. The [flat-render decision](./docs/decisions/0004-flat-fridge-render.md) records why the fridge is a flat illustration.
 
-Posts can move across almost the whole fridge front, including the upper door and near the edges. The fridge retains its original size, with tools below. Text, photo, and voice each have separate card and modal components in `packages/fridge-ui/src/posts` and `packages/fridge-ui/src/modals`. They share the card interaction wrapper and `PostModalFrame` template.
+Posts can move across almost the whole fridge front, including the upper door and near the edges. The fridge retains its original size, with tools below. Text, photo, and voice each have separate card and modal components in `packages/fridge-ui/src/features/fridge/components/posts` and `packages/fridge-ui/src/features/fridge/components/modals`. They share the card interaction wrapper and `PostModalFrame` template.
+
+The home switcher shows a small fridge preview for each home. Creating a home and managing people use separate dialogs, with the same focus, Escape, and scroll handling as post editors. These components live in `packages/fridge-ui/src/features/homes/components`; Firebase and navigation stay in the Next.js shell; the shared homes feature owns request coordination and state. Slow responses cannot reopen a home you left, and a temporary refresh failure keeps the current fridge open while retrying.
 
 ## Browser checks
 
@@ -25,6 +27,8 @@ pnpm test:browser
 ```
 
 The tests start their own production server on port 3100 and cover desktop and emulated touch. `pnpm check` includes the focused unit tests; browser tests run separately. If a managed browser already exists locally, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select its executable. This machine uses a cached Chromium installation because the matching browser download timed out. CI installs Playwright's matching Chromium.
+
+Home-flow browser tests use an isolated Firebase browser-session fixture and intercept Firebase and application API requests. They cover the signed-in switcher, creation and settings dialogs, retry, sign-out, and delayed refreshes without contacting real accounts or modifying the database. They require the public Firebase build configuration; CI supplies dummy public values. These tests do not replace the real Google sign-in and two-account walkthrough.
 
 Physical phone validation remains pending. Test card dragging, scrolling, modal editing with the virtual keyboard, and sample audio on an actual phone before treating touch support as device-verified.
 
@@ -126,7 +130,7 @@ Icon additions and redesigns follow the [icon design guidelines](./docs/design/i
 
 ```text
 apps/web              Next.js platform shell, public assets, and HTTP routes
-packages/fridge-ui    Shared React UI, Three.js scene, interactions, and styles
+packages/fridge-ui    Shared React UI, fridge illustration, interactions, and styles
 packages/contracts    Public API schemas and types
 packages/api-client   Browser-safe authenticated HTTP calls
 packages/domain       Pure rules shared by future clients and services
@@ -136,6 +140,24 @@ packages/config       Shared TypeScript configuration
 ```
 
 The web shell renders `fridge-ui` and supplies its platform asset locations. Future Electron and Capacitor shells will compile the same package. Browser and future desktop/mobile code may use `fridge-ui`, `contracts`, `domain`, and `api-client`. `server` and `database` stay on the backend.
+
+## Shared frontend organization
+
+The React frontend is grouped by feature inside `packages/fridge-ui/src/features`. Home state, operations, queries, and cache keys live alongside the components. The fridge illustration, cards, and editors live in the fridge feature. Common dialog, icon, and brand components live in `src/ui`.
+
+`HomesProvider` creates one controller for its descendants. `useHomes()` reads that existing controller, so forms can call named operations directly without passing every action through the component tree. The controller uses TanStack Query for server state (profile and home queries, named mutations, polling) with small client state in `useState`. It receives the API client and authentication adapter from the application shell.
+
+| Location                                       | Responsibility                                                |
+| ---------------------------------------------- | ------------------------------------------------------------- |
+| `features/homes/components`                    | Home switcher, dialogs, and forms                             |
+| `features/homes/use-homes-controller.ts`       | Queries, named mutations, account subscription, derived state |
+| `features/homes/homes-keys.ts`                 | Account-scoped query keys                                     |
+| `features/homes/homes-query-client.ts`         | Query client defaults: no auto-retry, 15-second freshness     |
+| `apps/web/src/platform/auth`                   | Firebase configuration and the web authentication adapter     |
+| `apps/web/src/platform/api`                    | Configure the API client's token access                       |
+| `apps/web/src/features/homes/web-home-app.tsx` | Supply the provider and own Next.js navigation                |
+
+See [the frontend architecture guide](docs/architecture/frontend.md) for the folder tree, a complete rename trace, and the rules for adding features. Lint prevents shared frontend code from importing platform SDKs or backend modules. Controller, cache-key, and provider tests run with `pnpm test`; browser tests cover the connected flows on desktop and touch layouts.
 
 ## Database changes
 

@@ -16,8 +16,9 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 export const homeIdSchema = z.uuid();
 export const homeNameSchema = z.string().trim().min(1).max(80);
 export const inviteEmailSchema = z
-  .email()
+  .string()
   .trim()
+  .pipe(z.email())
   .transform((email) => email.toLowerCase());
 export const createHomeSchema = z.object({ name: homeNameSchema });
 export const renameHomeSchema = createHomeSchema;

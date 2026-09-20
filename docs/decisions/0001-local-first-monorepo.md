@@ -5,7 +5,7 @@
 
 ## Context
 
-Noted starts as a Next.js web application, with Electron and Capacitor clients planned after the web product is useful. The foundation and 3D prototype should work without cloud credentials. Identity work will use online Firebase Authentication; production will use Neon PostgreSQL, while images and voice recordings will eventually require private object storage.
+Noted starts as a Next.js web application, with Electron and Capacitor clients planned after the web product is useful. The foundation and prototype should work without cloud credentials. (The prototype renderer was 3D at the time; it was later replaced by the flat illustration, see ADR 0004.) Identity work will use online Firebase Authentication; production will use Neon PostgreSQL, while images and voice recordings will eventually require private object storage.
 
 ## Decision
 

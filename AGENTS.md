@@ -1,5 +1,15 @@
 # Noted project instructions
 
+## Frontend architecture
+
+Follow [the shared frontend architecture](docs/architecture/frontend.md) when adding or changing frontend features.
+
+- Keep reusable components, state, and operations together under `packages/fridge-ui/src/features/<feature>`. Put common visual primitives in `src/ui`.
+- Application shells own platform SDKs, authentication adapters, API configuration, and navigation. Shared features receive those capabilities through their provider.
+- `HomesProvider` owns one controller. Components consume it through `useHomes()`; they must not create additional controllers to access the same feature state.
+- Prefer named handlers and explicit `async/await` operations. Avoid generic wrappers that require callers to pass nested work and completion callbacks merely to save repeated lines.
+- Keep tests close to the behavior they verify and update the architecture guide when ownership or public entry points change.
+
 ## Icons and brand artwork
 
 Before adding or modifying interface icons, the Noted brand mark, the wordmark, or the favicon, read [the icon design guidelines](docs/design/icons.md) and inspect the referenced source files.

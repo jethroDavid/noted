@@ -16,6 +16,40 @@ export default defineConfig([
       "@next/next/no-img-element": "off",
     },
   },
+  {
+    files: ["packages/fridge-ui/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "next",
+                "next/**",
+                "firebase",
+                "firebase/**",
+                "firebase-admin",
+                "firebase-admin/**",
+                "electron",
+                "@capacitor/**",
+                "@noted/server",
+                "@noted/server/**",
+                "@noted/database",
+                "@noted/database/**",
+                "@/**",
+                "**/apps/**",
+                "node:*",
+              ],
+              message:
+                "Shared frontend features receive platform capabilities from their provider. Keep platform SDKs and backend code in the application shell.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   globalIgnores([
     "**/.next/**",
     "**/coverage/**",

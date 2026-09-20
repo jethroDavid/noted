@@ -4,13 +4,34 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("renders the 3D fridge, fixtures, and working photo and audio", async ({
+test("renders the illustrated fridge, fixtures, and working photo and audio", async ({
   page,
-}) => {
+}, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await expect(page.locator("canvas")).toBeVisible();
+  const artwork = page.locator(".fridge-artwork");
+  await expect(artwork).toBeVisible();
+  await expect
+    .poll(() =>
+      artwork.evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+    )
+    .toBe(true);
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Choose fridge model" }),
+  ).toHaveCount(0);
   await expect(page.locator(".post")).toHaveCount(4);
+  await page.locator(".fridge-stage").screenshot({
+    path: testInfo.outputPath("fridge.png"),
+    animations: "disabled",
+  });
+  await page.screenshot({
+    path: testInfo.outputPath("kitchen.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
   await page.getByRole("button", { name: "Open Mountain lake photo" }).click();
   await expect(page.locator(".photo-preview img")).toBeVisible();
   expect(
@@ -37,6 +58,46 @@ test("renders the 3D fridge, fixtures, and working photo and audio", async ({
     )
     .toBeGreaterThan(0);
   expect(errors).toEqual([]);
+});
+
+test("painted kitchen backdrop sits behind the interactive fridge", async ({
+  page,
+}) => {
+  const backdrop = page.locator(".kitchen-backdrop");
+  await expect(backdrop).toBeVisible();
+  await expect(backdrop).toHaveAttribute("aria-hidden", "true");
+  expect(
+    await backdrop
+      .locator("img")
+      .evaluate(
+        (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
+      ),
+  ).toBe(true);
+  const hitInsideFridge = await page.evaluate(() => {
+    const stage = document.querySelector(".fridge-stage")!;
+    const rect = stage.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      rect.x + rect.width / 2,
+      rect.y + rect.height / 2,
+    );
+    return Boolean(hit && stage.contains(hit));
+  });
+  expect(hitInsideFridge).toBe(true);
+});
+
+test("a failed fridge image falls back without blocking posts", async ({
+  page,
+}) => {
+  await page.route("**/artwork/cream-fridge.webp", (route) => route.abort());
+  await page.reload();
+  await expect(page.locator(".fridge-flat-door")).toHaveCount(2);
+  await expect(page.locator(".fridge-artwork")).toHaveCount(0);
+  await page.getByRole("button", { name: "Note", exact: true }).click();
+  await page.getByLabel("Your message").fill("Still at home");
+  await page.getByRole("button", { name: "Put on fridge" }).click();
+  await expect(
+    page.getByRole("button", { name: "Open Still at home" }),
+  ).toBeVisible();
 });
 
 test("creates and edits notes, cancels a draft, and resets on reload", async ({
@@ -183,134 +244,52 @@ test("small-screen editor and fixture creation remain usable", async ({
   await expect(page.locator(".post")).toHaveCount(6);
 });
 
-test("fridge stays usable when WebGL is unavailable", async ({ page }) => {
-  await page.addInitScript(() => {
-    const original = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (
-      type: string,
-      ...args: unknown[]
-    ) {
-      if (type.startsWith("webgl")) return null;
-      return Reflect.apply(original, this, [type, ...args]);
-    } as typeof original;
-  });
-  await page.reload();
-  await expect(
-    page.getByText("Simple fridge view · 3D is unavailable in this browser"),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Choose fridge model" }).click();
-  await page.getByRole("button", { name: "Butter retro", exact: true }).click();
-  await expect(page.locator(".fridge-fallback")).toHaveCSS(
-    "background-color",
-    "rgb(244, 223, 172)",
-  );
-  await page.getByRole("button", { name: "Note", exact: true }).click();
-  await page.getByLabel("Your message").fill("Still works");
-  await page.getByRole("button", { name: "Put on fridge" }).click();
-  await expect(
-    page.getByRole("button", { name: "Open Still works" }),
-  ).toBeVisible();
-});
-
-test("switches all fridge models without resetting notes or their positions", async ({
+test("all post kinds stay inside the painted doors at every corner", async ({
   page,
-}) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  const note = page.locator('[data-post-id="groceries"]');
-  await note.focus();
-  await page.keyboard.press("ArrowRight");
-  await note.click();
-  await page.getByLabel("Your message").fill("Keep this on every fridge");
-  await page.getByRole("button", { name: "Save note" }).click();
-  const trigger = page.getByRole("button", { name: "Choose fridge model" });
-  for (const [name, id] of [
-    ["Butter retro", "retro"],
-    ["Blue duo", "duo"],
-    ["Sage classic", "classic"],
-  ]) {
-    await trigger.click();
-    await page.getByRole("button", { name, exact: true }).click();
-    await expect(page.locator(".fridge-stage")).toHaveAttribute(
-      "data-model",
-      id,
-    );
-    await expect(trigger).toBeFocused();
-    await expect(trigger).toHaveAttribute("aria-expanded", "false");
-    await expect(note).toHaveAttribute("data-x", "0.34");
-    await expect(note).toHaveAttribute("data-order", "0");
-    await expect(note).toContainText("Keep this on every fridge");
-    await expect(page.locator("canvas")).toBeVisible();
-    await expect(page.locator(".post")).toHaveCount(4);
-  }
-  expect(errors).toEqual([]);
-});
-
-test("model chooser fits small screens and supports keyboard and outside dismissal", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 360, height: 740 });
-  const trigger = page.getByRole("button", { name: "Choose fridge model" });
-  await trigger.focus();
-  await page.keyboard.press("Enter");
-  const current = page.getByRole("button", {
-    name: "Sage classic",
-    exact: true,
-  });
-  await expect(current).toBeFocused();
-  await expect(current).toHaveAttribute("aria-pressed", "true");
-  await expect(
-    page.getByRole("button", { name: "Blue duo", exact: true }),
-  ).toBeInViewport();
-  const panel = (await page.locator(".model-picker-panel").boundingBox())!;
-  expect(panel.x).toBeGreaterThanOrEqual(0);
-  expect(panel.x + panel.width).toBeLessThanOrEqual(360);
-  await page.keyboard.press("Escape");
-  await expect(trigger).toBeFocused();
-  await expect(trigger).toHaveAttribute("aria-expanded", "false");
-  await trigger.click();
-  await page.getByRole("heading", { name: "On the fridge." }).click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "false");
-});
-
-test("all post kinds can reach the upper door and outer edges on every model", async ({
-  page,
-}) => {
+}, testInfo) => {
   const stage = (await page.locator(".fridge-stage").boundingBox())!;
-  const surface = (await page.locator(".board-surface").boundingBox())!;
-  // The surface extends well above and beyond the former lower-door rectangle.
-  expect(surface.y - stage.y).toBeLessThan(stage.height * 0.08);
-  expect(surface.height).toBeGreaterThan(stage.height * 0.85);
-  expect(surface.width).toBeGreaterThan(stage.width * 0.75);
-  const models = ["Sage classic", "Butter retro", "Blue duo"];
-  const ids = ["groceries", "weekend", "hello"];
-  for (let i = 0; i < models.length; i++) {
-    await page.getByRole("button", { name: "Choose fridge model" }).click();
-    await page.getByRole("button", { name: models[i], exact: true }).click();
-    const card = page.locator('[data-post-id="' + ids[i] + '"]');
+  const ids = ["groceries", "weekend", "hello", "dinner"];
+  const corners = [
+    ["ArrowUp", "ArrowLeft"],
+    ["ArrowUp", "ArrowRight"],
+    ["ArrowDown", "ArrowRight"],
+    ["ArrowDown", "ArrowLeft"],
+  ];
+  for (const [index, id] of ids.entries()) {
+    const card = page.locator(`[data-post-id="${id}"]`);
     await card.focus();
-    for (let step = 0; step < 20; step++) {
-      await page.keyboard.press("Shift+ArrowUp");
-      await page.keyboard.press("Shift+ArrowLeft");
+    // Visit all corners; finish each card at a different one for visual review.
+    for (let corner = 0; corner < 4; corner++) {
+      const directions = corners[(corner + index + 1) % 4];
+      for (let step = 0; step < 20; step++) {
+        for (const direction of directions) {
+          await page.keyboard.press(`Shift+${direction}`);
+        }
+      }
+      const bounds = (await card.boundingBox())!;
+      const frame = (await page.locator(".fridge-stage").boundingBox())!;
+      // Independently measured safe envelope inside the artwork, not just the
+      // old .board-surface box (which includes transparent and curved edges).
+      expect(bounds.x).toBeGreaterThan(frame.x + frame.width * 0.16);
+      expect(bounds.x + bounds.width).toBeLessThan(
+        frame.x + frame.width * 0.85,
+      );
+      expect(bounds.y).toBeGreaterThan(frame.y + frame.height * 0.11);
+      expect(bounds.y + bounds.height).toBeLessThan(
+        frame.y + frame.height * 0.91,
+      );
+      await expect(page.getByRole("dialog")).toHaveCount(0);
     }
-    const upper = (await card.boundingBox())!;
-    const bounds = (await page.locator(".board-surface").boundingBox())!;
-    expect(Math.abs(upper.x - bounds.x)).toBeLessThan(1);
-    expect(Math.abs(upper.y - bounds.y)).toBeLessThan(1);
-    for (let step = 0; step < 20; step++) {
-      await page.keyboard.press("Shift+ArrowDown");
-      await page.keyboard.press("Shift+ArrowRight");
-    }
-    const lower = (await card.boundingBox())!;
-    const after = (await page.locator(".board-surface").boundingBox())!;
-    expect(
-      Math.abs(lower.x + lower.width - after.x - after.width),
-    ).toBeLessThan(1);
-    expect(
-      Math.abs(lower.y + lower.height - after.y - after.height),
-    ).toBeLessThan(1);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
   }
+  // Bounds changes must not shrink the actual cards.
+  const note = (await page
+    .locator('[data-post-id="groceries"]')
+    .boundingBox())!;
+  expect(note.width / stage.width).toBeCloseTo(196 / 700, 2);
+  await page.locator(".fridge-stage").screenshot({
+    path: testInfo.outputPath("fridge-corners.png"),
+    animations: "disabled",
+  });
 });
 
 for (const [kind, id, title] of [

@@ -1,6 +1,6 @@
 # ADR 0003: Shared React frontend with platform shells
 
-- Status: accepted
+- Status: accepted; the Three.js scene bullets below were superseded by ADR 0004
 - Date: 2026-09-18
 
 ## Context
@@ -9,11 +9,11 @@ The Phase 2 fridge was implemented inside `apps/web`, but the intended Electron 
 
 ## Decision
 
-- Put the existing React fridge, Three.js scene, interaction rules, focused tests, and scoped styles in `packages/fridge-ui`.
+- Put the existing React fridge, interaction rules, focused tests, and scoped styles in `packages/fridge-ui`. (The package originally also held the Three.js scene; that renderer was later removed under ADR 0004.)
 - Keep App Router files, metadata, fonts, public assets, HTTP routes, and server-only code in `apps/web`.
 - Let the Next.js shell render `fridge-ui` and pass the current photo/audio asset locations as serializable props.
 - Keep `fridge-ui` based on React DOM and browser standards. It must not import Next.js, Electron, Capacitor, database code, or privileged server modules.
-- Detect browser/WebGL availability inside the shared scene without requiring Next.js dynamic imports. The simple CSS fridge remains visible when WebGL is unavailable.
+- Detect browser/WebGL availability inside the shared scene without requiring Next.js dynamic imports. The simple CSS fridge remains visible when WebGL is unavailable. (Superseded: there is no WebGL path anymore; the SVG is now an image-load fallback under ADR 0004.)
 - Have future Electron and Capacitor shells compile the same package and supply concrete native capability adapters when camera, recording, authentication callbacks, or OS integration are implemented.
 - Introduce `packages/api-client` with the first real identity/home HTTP operations in Phase 4. Do not create artificial backend traffic during the frontend-only extraction.
 
