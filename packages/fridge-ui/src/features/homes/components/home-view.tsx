@@ -24,10 +24,18 @@ export function HomeView({
       notice={showPeople ? null : error}
       headerAction={
         <>
-          <button onClick={backToHomes} disabled={busy}>
+          <button
+            className="secondary-button"
+            onClick={backToHomes}
+            disabled={busy}
+          >
             Homes
           </button>
-          <button onClick={() => setShowPeople(true)} aria-haspopup="dialog">
+          <button
+            className="secondary-button"
+            onClick={() => setShowPeople(true)}
+            aria-haspopup="dialog"
+          >
             People
           </button>
         </>

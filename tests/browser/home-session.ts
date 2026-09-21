@@ -94,7 +94,9 @@ export async function installBrowserSession(page: Page) {
   // Enter the origin before populating its IndexedDB. The next navigation restores it.
   await page.goto("/app");
   await page.waitForFunction(() => {
-    const button = document.querySelector<HTMLButtonElement>(".header-primary");
+    const button = document.querySelector<HTMLButtonElement>(
+      ".app-header-action button",
+    );
     return button && !button.disabled;
   });
   await page.evaluate(

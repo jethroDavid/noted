@@ -60,6 +60,101 @@ test("renders the illustrated fridge, fixtures, and working photo and audio", as
   expect(errors).toEqual([]);
 });
 
+test("plant grows only with new posts and retains growth after removal", async ({
+  page,
+  isMobile,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const plant = page.locator(".fridge-plant");
+  await expect(plant).toHaveAttribute("data-growth-stage", "small");
+  await expect(plant).toHaveAttribute("aria-hidden", "true");
+  await expect(plant).toHaveCSS("pointer-events", "none");
+  await expect
+    .poll(() =>
+      plant
+        .locator("img")
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              (image as HTMLImageElement).complete &&
+              (image as HTMLImageElement).naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("plant-small.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+
+  // Cancelling, editing, and moving the fixtures are not new activity.
+  await page.getByRole("button", { name: "Note", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  const groceries = page.locator('[data-post-id="groceries"]');
+  await groceries.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Enter");
+  await page.getByLabel("Your message").fill("Edited shopping list");
+  await page.getByRole("button", { name: "Save note" }).click();
+
+  for (let count = 1; count <= 12; count++) {
+    const kind = ["Note", "Photo", "Voice"][(count - 1) % 3];
+    await page.getByRole("button", { name: kind, exact: true }).click();
+    if (kind === "Note")
+      await page.getByLabel("Your message").fill(`New note ${count}`);
+    await page.getByRole("button", { name: "Put on fridge" }).click();
+    const stage =
+      count < 4
+        ? "small"
+        : count < 8
+          ? "growing"
+          : count < 12
+            ? "lush"
+            : "overgrown";
+    await expect(plant).toHaveAttribute("data-growth-stage", stage);
+    if (count % 4 === 0) {
+      await expect(plant.locator('img[data-active="true"]')).toHaveCSS(
+        "opacity",
+        "1",
+      );
+      await page.screenshot({
+        path: testInfo.outputPath(`plant-${stage}.png`),
+        fullPage: true,
+        animations: "disabled",
+      });
+    }
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    await page.evaluate(() => window.innerWidth),
+  );
+  if (isMobile) {
+    const bounds = (await plant.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+  }
+
+  await page.clock.install();
+  await groceries.focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Remove from fridge" }).click();
+  await expect(plant).toHaveAttribute("data-growth-stage", "overgrown");
+  await groceries.focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Undo removal", exact: true }).click();
+  await expect(plant).toHaveAttribute("data-growth-stage", "overgrown");
+  await groceries.focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Remove from fridge" }).click();
+  await page.clock.fastForward(3_600_000);
+  await expect(groceries).toHaveCount(0);
+  await expect(plant).toHaveAttribute("data-growth-stage", "overgrown");
+  await page.reload();
+  await expect(plant).toHaveAttribute("data-growth-stage", "small");
+});
+
 test("painted kitchen backdrop sits behind the interactive fridge", async ({
   page,
 }) => {
@@ -242,6 +337,27 @@ test("small-screen editor and fixture creation remain usable", async ({
     await page.getByRole("button", { name: "Put on fridge" }).click();
   }
   await expect(page.locator(".post")).toHaveCount(6);
+});
+
+test("header sign-in uses the shared small primary button", async ({
+  page,
+}) => {
+  const action = page.locator(".app-header-action button");
+  await expect(action).toHaveClass("primary-button primary-button--small");
+  await expect(action).toHaveCSS("background-color", "rgb(82, 101, 69)");
+});
+
+test("composer is a labeled bar below the fridge", async ({ page }) => {
+  await expect(page.locator(".fridge-column")).toHaveCSS(
+    "flex-direction",
+    "column",
+  );
+  await expect(page.locator(".composer")).toHaveCSS("flex-direction", "row");
+  await expect(page.locator(".composer-button-label").first()).toBeVisible();
+  await expect(page.getByText("Leave a little something")).toHaveCount(0);
+  const stage = (await page.locator(".fridge-stage").boundingBox())!;
+  const bar = (await page.locator(".composer").boundingBox())!;
+  expect(bar.y).toBeGreaterThanOrEqual(stage.y + stage.height - 1);
 });
 
 test("all post kinds stay inside the painted doors at every corner", async ({

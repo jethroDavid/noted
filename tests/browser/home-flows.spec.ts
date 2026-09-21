@@ -44,6 +44,23 @@ test("signed-in users can keep playing, open the switcher, and sign out", async 
   ).toBeEnabled();
 });
 
+test("home header actions use the shared secondary button", async ({
+  page,
+}) => {
+  await page.goto("/app/homes");
+  await page.getByRole("button", { name: /The Sunday home/ }).click();
+  const headerAction = page.locator(".app-header-action");
+  await expect(
+    headerAction.getByRole("button", { name: "Homes", exact: true }),
+  ).toHaveClass("secondary-button");
+  await expect(
+    headerAction.getByRole("button", { name: "Homes", exact: true }),
+  ).toHaveCSS("background-color", "rgb(250, 249, 244)");
+  await expect(
+    headerAction.getByRole("button", { name: "People", exact: true }),
+  ).toHaveClass("secondary-button");
+});
+
 test("creation dialog handles failure, retries once, and opens the created fridge", async ({
   page,
 }) => {

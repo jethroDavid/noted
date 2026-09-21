@@ -70,7 +70,7 @@ export function WebFridge() {
       notice={error}
       headerAction={
         <button
-          className="header-primary"
+          className="primary-button primary-button--small"
           disabled={busy || !authReady}
           onClick={() => void openHomes()}
         >

@@ -38,6 +38,7 @@ packages/fridge-ui/src/
       components/
         fridge-app.tsx
         fridge-artwork.tsx     Shared image renderer and load-failure fallback
+        fridge-plant.tsx       Decorative growth-stage images
         fridge-flat.tsx        Local SVG fallback
         post-card.tsx
         post-modal.tsx
@@ -46,6 +47,8 @@ packages/fridge-ui/src/
       state/
         board.ts
         board.test.ts
+        plant-growth.ts       Addition milestones and stage selection
+        plant-growth.test.ts
       index.ts
   ui/
     dialog-frame.tsx
@@ -118,4 +121,6 @@ Polling uses TanStack's interval plus its visibility-change and reconnect refetc
 
 ## Fridge artwork
 
-The web shell supplies `kitchenBackdrop` and `fridgeArtwork` URLs through `FridgeAssets`. The shared feature uses ordinary image elements, keeping it independent of Next.js image components. The background and transparent fridge are separate assets; notes remain accessible HTML on the unchanged logical board. `FridgeArtwork` owns only image-load failure state and falls back to the local SVG. New platform shells can package the same artwork and supply their own URLs.
+The web shell supplies `kitchenBackdrop`, `fridgeArtwork`, and optional `plantArtwork` URLs through `FridgeAssets`. The shared feature uses ordinary image elements, keeping it independent of Next.js image components. The background, bare fridge, and plant are separate assets; notes remain accessible HTML on the unchanged logical board. `FridgeArtwork` owns only image-load failure state and falls back to the local SVG. New platform shells can package the same artwork and supply their own URLs.
+
+`FridgeApp` owns the preview's addition count, incremented only when saving a new post. `plant-growth.ts` maps that activity to a stage; `FridgePlant` receives the stage and renders decorative images. Editing, moving, removal, expiry, and Undo do not change growth. Fixture posts do not count as user activity. This is preview state and resets on refresh, like the posts themselves. When posts become persistent, record successful additions per home on the server and supply the resulting growth state; do not infer activity from the number of remaining posts.

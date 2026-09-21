@@ -14,6 +14,8 @@ import { Icon } from "../../../ui/icons";
 import { PostRenderer } from "./posts/index";
 import { PostModal } from "./post-modal";
 import { FridgeArtwork } from "./fridge-artwork";
+import { FridgePlant } from "./fridge-plant";
+import { getPlantStage } from "../state/plant-growth";
 import type { FridgeAssets } from "../../../types";
 import { BrandLink } from "../../../ui/brand-link";
 
@@ -35,6 +37,7 @@ export function FridgeApp({
   brandHref?: string;
 }) {
   const [posts, setPosts] = useState<Post[]>(fixturePosts);
+  const [postAdditions, setPostAdditions] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ post: Post; isNew: boolean } | null>(
     null,
@@ -66,6 +69,7 @@ export function FridgeApp({
   }
 
   function save(post: Post) {
+    if (editor?.isNew) setPostAdditions((current) => current + 1);
     setPosts((current) =>
       editor?.isNew
         ? [...current, post]
@@ -150,7 +154,7 @@ export function FridgeApp({
         )}
         <section className="workspace-heading" aria-labelledby="page-title">
           <p className="eyebrow">
-            {isPlayground ? "Your playground" : homeName}
+            {isPlayground ? "" : homeName}
           </p>
           <h1 id="page-title">
             On the fridge<span>.</span>
@@ -165,50 +169,102 @@ export function FridgeApp({
             {visiblePosts.length} little things
           </div>
         </section>
-        <div className="fridge-stage" aria-label="Family refrigerator">
-          <div className="fridge-shadow" aria-hidden="true" />
-          <FridgeArtwork artwork={assets.fridgeArtwork} />
-          <div className="freezer-decoration" aria-hidden="true">
-            <span className="fridge-name">the good stuff</span>
-            <span className="little-star">✳</span>
-            <span className="freezer-sticker">
-              home
-              <br />
-              <b>sweet</b>
-              <br />
-              home
+        <div className="fridge-column">
+          <div className="workspace-bottom">
+            <p className="interaction-hint" id="board-instructions">
+              <span className="sr-only">
+                . With keyboard focus, use arrow keys to move a post, Shift for
+                larger steps, and Enter to open.
+              </span>
+            </p>
+            <div
+              className="composer"
+              role="group"
+              aria-label="Add to the fridge"
+            >
+              <button
+                onClick={() => add("text")}
+                aria-label="Note"
+                title="Note"
+              >
+                <span className="tool-icon tool-icon--note">
+                  <Icon name="note" />
+                </span>
+                <span className="composer-button-label">Note</span>
+              </button>
+              <button
+                onClick={() => add("photo")}
+                aria-label="Photo"
+                title="Photo"
+              >
+                <span className="tool-icon tool-icon--photo">
+                  <Icon name="photo" />
+                </span>
+                <span className="composer-button-label">Photo</span>
+              </button>
+              <button
+                onClick={() => add("voice")}
+                aria-label="Voice"
+                title="Voice"
+              >
+                <span className="tool-icon tool-icon--voice">
+                  <Icon name="voice" />
+                </span>
+                <span className="composer-button-label">Voice</span>
+              </button>
+            </div>
+          </div>
+          <div className="fridge-stage" aria-label="Family refrigerator">
+            <div className="fridge-shadow" aria-hidden="true" />
+            <FridgeArtwork artwork={assets.fridgeArtwork} />
+            <FridgePlant
+              artwork={assets.plantArtwork}
+              stage={getPlantStage(postAdditions)}
+            />
+            <div className="freezer-decoration" aria-hidden="true">
+              <span className="fridge-name">the good stuff</span>
+              <span className="little-star">✳</span>
+              <span className="freezer-sticker">
+                home
+                <br />
+                <b>sweet</b>
+                <br />
+                home
+              </span>
+            </div>
+            <section
+              className="board-surface"
+              aria-label="Fridge posts"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) setSelectedId(null);
+              }}
+            >
+              {visiblePosts.map((post) => (
+                <PostRenderer
+                  key={post.id}
+                  photo={assets.samplePhoto}
+                  post={post}
+                  selectedId={selectedId}
+                  topOrder={topOrder}
+                  select={setSelectedId}
+                  move={move}
+                  open={(selected) =>
+                    setEditor({ post: selected, isNew: false })
+                  }
+                />
+              ))}
+              {visiblePosts.length === 0 && (
+                <p className="empty-fridge">
+                  A little space for something good.
+                  <br />
+                  Add the first note.
+                </p>
+              )}
+            </section>
+            <span className="fridge-badge" aria-hidden="true">
+              NOTED
             </span>
           </div>
-          <section
-            className="board-surface"
-            aria-label="Fridge posts"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) setSelectedId(null);
-            }}
-          >
-            {visiblePosts.map((post) => (
-              <PostRenderer
-                key={post.id}
-                photo={assets.samplePhoto}
-                post={post}
-                selectedId={selectedId}
-                topOrder={topOrder}
-                select={setSelectedId}
-                move={move}
-                open={(selected) => setEditor({ post: selected, isNew: false })}
-              />
-            ))}
-            {visiblePosts.length === 0 && (
-              <p className="empty-fridge">
-                A little space for something good.
-                <br />
-                Add the first note.
-              </p>
-            )}
-          </section>
-          <span className="fridge-badge" aria-hidden="true">
-            NOTED
-          </span>
         </div>
         <aside className="workspace-aside">
           <span className="handwritten-arrow" aria-hidden="true">
@@ -220,44 +276,9 @@ export function FridgeApp({
           </p>
           <span>Make yourself at home.</span>
         </aside>
-        <div className="workspace-bottom">
-          <p className="interaction-hint" id="board-instructions">
-            Drag to rearrange · Tap to open
-            <span className="sr-only">
-              . With keyboard focus, use arrow keys to move a post, Shift for
-              larger steps, and Enter to open.
-            </span>
-          </p>
-          <div className="composer" role="group" aria-label="Add to the fridge">
-            <span className="composer-label">Leave a little something</span>
-            <button onClick={() => add("text")}>
-              <span className="tool-icon tool-icon--note">
-                <Icon name="note" />
-              </span>
-              Note
-              <Icon name="plus" size={14} />
-            </button>
-            <button onClick={() => add("photo")}>
-              <span className="tool-icon tool-icon--photo">
-                <Icon name="photo" />
-              </span>
-              Photo
-              <Icon name="plus" size={14} />
-            </button>
-            <button onClick={() => add("voice")}>
-              <span className="tool-icon tool-icon--voice">
-                <Icon name="voice" />
-              </span>
-              Voice
-              <Icon name="plus" size={14} />
-            </button>
-          </div>
-        </div>
       </main>
       <footer className="app-footer">
-        <span>
-          <i /> A little space for your people.
-        </span>
+        <span></span>
         <span>
           {isPlayground
             ? "Playground · Changes reset on refresh"

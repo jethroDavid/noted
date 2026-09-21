@@ -32,9 +32,6 @@ export function HomeSwitcher({
       <header className="portal-header">
         <BrandLink href={playgroundHref} />
         <nav aria-label="Account navigation">
-          <a className="portal-playground-link" href={playgroundHref}>
-            Playground
-          </a>
           {me && (
             <>
               <span className="portal-account" title={displayName}>
