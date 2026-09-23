@@ -751,6 +751,23 @@
   .swatch--ink {
     color: #fff;
   }
+  .modal-error {
+    margin: 16px 0 0;
+    padding: 10px 12px;
+    border: 1px solid #d6b5a8;
+    border-radius: 7px;
+    background: #fff0e9;
+    color: #7b3f36;
+    font-size: 13px;
+  }
+  .fridge-status {
+    display: grid;
+    gap: 12px;
+    justify-items: center;
+    max-width: 420px;
+    margin: 48px auto;
+    text-align: center;
+  }
   .modal-footer {
     display: flex;
     justify-content: space-between;
@@ -1494,6 +1511,11 @@
     font-size: 13px;
     line-height: 1.6;
     overflow-wrap: anywhere;
+  }
+  .home-route-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
   }
   .home-dialog {
     width: min(540px, calc(100% - 28px));

@@ -10,6 +10,7 @@
   "scripts": {
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "tsx src/migrate.ts",
+    "db:prune-expired": "tsx src/prune-expired.ts",
     "db:seed": "tsx src/seed.ts",
     "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
     "typecheck": "tsc --noEmit"

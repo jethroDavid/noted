@@ -30,24 +30,39 @@ function isAccessLost(cause: unknown) {
   );
 }
 
+export type HomesNavigation = {
+  /** Selected home id owned by the host shell (the route, on web). */
+  homeId?: string | null;
+  onOpenHome?: (id: string) => void;
+  onBackToHomes?: () => void;
+};
+
 /** One instance per HomesProvider. Components consume it through useHomes(). */
 export function useHomesController(
   api: NotedApiClient,
   auth: HomesAuth,
   onSignedOut?: () => void,
+  navigation?: HomesNavigation,
 ) {
+  const { homeId = null, onOpenHome, onBackToHomes } = navigation ?? {};
   const queryClient = useQueryClient();
   const configured = auth.isConfigured();
   const [accountId, setAccountId] = useState<string | undefined>(undefined);
   const [accountResolved, setAccountResolved] = useState(false);
-  const [selectedHomeId, setSelectedHomeId] = useState<string | null>(null);
-  const [pendingSelectId, setPendingSelectId] = useState<string | null>(null);
+  const [ignoredHomeId, setIgnoredHomeId] = useState<string | null>(null);
   const [operationError, setOperationError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const [signedOutError, setSignedOutError] = useState<string | null>(null);
   const [signInPending, setSignInPending] = useState(false);
   const [signOutPending, setSignOutPending] = useState(false);
   const generationRef = useRef(0);
+  const prevHomeIdRef = useRef(homeId);
+  const keepErrorRef = useRef(false);
+
+  // Selection belongs to the host shell. The controller only dismisses the
+  // current id locally (leave, lost access) until navigation lands.
+  const selectedHomeId =
+    ignoredHomeId !== null && ignoredHomeId === homeId ? null : homeId;
 
   const queriesEnabled =
     configured && accountResolved && accountId !== undefined && !expired;
@@ -66,9 +81,6 @@ export function useHomesController(
     enabled: queriesEnabled && selectedHomeId !== null,
   });
 
-  const selectMutation = useMutation({
-    mutationFn: (id: string) => api.home(id),
-  });
   const createMutation = useMutation({
     mutationFn: (name: string) => api.createHome(name),
   });
@@ -93,8 +105,6 @@ export function useHomesController(
     setExpired(true);
     setSignedOutError(message);
     setOperationError(null);
-    setSelectedHomeId(null);
-    setPendingSelectId(null);
     queryClient.removeQueries({ queryKey: homesPrefix });
   }
 
@@ -107,8 +117,10 @@ export function useHomesController(
           homes: old.homes.filter((home) => home.id !== lostHomeId),
         },
     );
-    setSelectedHomeId(null);
+    setIgnoredHomeId(lostHomeId);
     setOperationError("You no longer have access to that home.");
+    keepErrorRef.current = true;
+    onBackToHomes?.();
   }
 
   async function loadProfile() {
@@ -153,8 +165,8 @@ export function useHomesController(
       setExpired(false);
       setSignedOutError(null);
       setOperationError(null);
-      setSelectedHomeId(null);
-      setPendingSelectId(null);
+      setIgnoredHomeId(null);
+      keepErrorRef.current = false;
     }
 
     function accountChanged(nextAccountId: string | undefined) {
@@ -175,6 +187,20 @@ export function useHomesController(
     const unsubscribe = auth.subscribe(accountChanged, accountFailed);
     return unsubscribe;
   }, [auth, queryClient]);
+
+  useEffect(() => {
+    // Leaving a view (including browser back/forward) drops late results and
+    // stale errors, exactly like navigating through backToHomes.
+    if (prevHomeIdRef.current === homeId) return;
+    prevHomeIdRef.current = homeId;
+    generationRef.current++;
+    setIgnoredHomeId(null);
+    if (keepErrorRef.current) {
+      keepErrorRef.current = false;
+    } else {
+      setOperationError(null);
+    }
+  }, [homeId]);
 
   useEffect(() => {
     // TanStack reacts to visibility changes, not window focus events, so
@@ -233,9 +259,15 @@ export function useHomesController(
     mode === "ready" && selectedHomeId !== null
       ? (homeQuery.data ?? null)
       : null;
+  const homeError =
+    selectedHomeId !== null &&
+    homeQuery.data == null &&
+    homeQuery.isError &&
+    !homeQuery.isFetching
+      ? messageOf(homeQuery.error, "This home couldn't load.")
+      : null;
 
   const busy =
-    selectMutation.isPending ||
     createMutation.isPending ||
     renameMutation.isPending ||
     inviteMutation.isPending ||
@@ -248,7 +280,6 @@ export function useHomesController(
     generationRef.current++;
     setOperationError(null);
     setSignedOutError(null);
-    setPendingSelectId(null);
     return {
       generation: generationRef.current,
       accountId: auth.getAccountId(),
@@ -286,21 +317,14 @@ export function useHomesController(
   }
 
   // Operations return true only when their result was applied to this view.
+  // Opening a home navigates there; the home query loads it by route id.
   async function selectHome(id: string): Promise<boolean> {
-    const stamp = beginOperation();
-    setPendingSelectId(id);
-    try {
-      const { home: selected } = await selectMutation.mutateAsync(id);
-      if (!appliesToView(stamp)) return false;
-      writeHomeToCache(stamp.accountId, selected);
-      setSelectedHomeId(selected.id);
-      return true;
-    } catch (cause) {
-      reportFailure(stamp, cause);
-      return false;
-    } finally {
-      if (appliesToView(stamp)) setPendingSelectId(null);
-    }
+    if (!onOpenHome) return false;
+    generationRef.current++;
+    setOperationError(null);
+    setSignedOutError(null);
+    onOpenHome(id);
+    return true;
   }
 
   async function createHome(name: string): Promise<boolean> {
@@ -309,7 +333,7 @@ export function useHomesController(
       const { home: created } = await createMutation.mutateAsync(name);
       if (!appliesToView(stamp)) return false;
       writeHomeToCache(stamp.accountId, created);
-      setSelectedHomeId(created.id);
+      onOpenHome?.(created.id);
       return true;
     } catch (cause) {
       reportFailure(stamp, cause);
@@ -326,7 +350,6 @@ export function useHomesController(
       });
       if (!appliesToView(stamp)) return false;
       writeHomeToCache(stamp.accountId, renamed);
-      setSelectedHomeId(renamed.id);
       return true;
     } catch (cause) {
       reportFailure(stamp, cause);
@@ -343,7 +366,6 @@ export function useHomesController(
       });
       if (!appliesToView(stamp)) return false;
       writeHomeToCache(stamp.accountId, updated);
-      setSelectedHomeId(updated.id);
       return true;
     } catch (cause) {
       reportFailure(stamp, cause);
@@ -363,7 +385,6 @@ export function useHomesController(
       });
       if (!appliesToView(stamp)) return false;
       writeHomeToCache(stamp.accountId, updated);
-      setSelectedHomeId(updated.id);
       return true;
     } catch (cause) {
       reportFailure(stamp, cause);
@@ -383,7 +404,8 @@ export function useHomesController(
       queryClient.removeQueries({
         queryKey: homeKey(stamp.accountId, homeId),
       });
-      setSelectedHomeId(null);
+      setIgnoredHomeId(homeId);
+      onBackToHomes?.();
       return true;
     } catch (cause) {
       reportFailure(stamp, cause);
@@ -393,9 +415,8 @@ export function useHomesController(
 
   function backToHomes() {
     generationRef.current++;
-    setSelectedHomeId(null);
-    setPendingSelectId(null);
     setOperationError(null);
+    onBackToHomes?.();
   }
 
   function retry() {
@@ -450,8 +471,9 @@ export function useHomesController(
     mode,
     me,
     home,
+    homeId: selectedHomeId,
+    homeError,
     busy,
-    openingHomeId: pendingSelectId,
     error,
     retry,
     signIn,

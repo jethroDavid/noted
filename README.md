@@ -2,13 +2,13 @@
 
 Noted is a shared family fridge for text notes, photos, and voice messages. Next.js is the first platform shell and the initial HTTP backend. The React fridge lives in a shared package that future Electron desktop and Capacitor mobile clients will compile into their own applications.
 
-Phases 2 and 3 implement the interactive fridge playground and its shared frontend boundary. Phase 4 adds Google identity, homes, and invitations; live Firebase account review remains pending. See [PLAN.md](./PLAN.md) for the product decisions and the full phase roadmap.
+Phases 2 and 3 implement the interactive fridge playground and its shared frontend boundary. Phase 4 adds Google identity, homes, and invitations; live Firebase account review remains pending. Phase 5 persists shared text notes with polling and slow removal; its live two-account review remains pending. See [PLAN.md](./PLAN.md) for the product decisions and the full phase roadmap.
 
 ## Try the fridge
 
 Run `pnpm dev` and open [localhost:3000/app](http://localhost:3000/app). The root URL redirects there. The Phase 2 playground works without starting PostgreSQL. Drag a post to move it; click or tap to open its modal. The toolbar creates text notes or adds sample photo/voice cards. Use Tab, arrow keys, and Enter for keyboard interaction.
 
-Changes are temporary and reset on refresh. Removing a post greys it out for exactly one hour, with Undo available by opening the post. Sign in from the playground to open the [home switcher](http://localhost:3000/app/homes); posts inside shared homes are still playground fixtures until Phase 5. Uploads and recording come in Phase 6. The fridge is a flat illustration, so it renders everywhere HTML does.
+Playground changes are temporary and reset on refresh. Removing a post greys it out for exactly one hour, with Undo available by opening the post. Sign in from the playground to open the [home switcher](http://localhost:3000/app/homes); inside a shared home, text notes persist in PostgreSQL and reach other members through polling, with the same one-hour greyed-out removal and shared Undo. Uploads and recording come in Phase 6. The fridge is a flat illustration, so it renders everywhere HTML does.
 
 The fridge uses painted cream enamel artwork with olive-and-brass handles and a trailing plant, set in a matching sunlit kitchen. Notes stay interactive above the artwork; a local SVG is retained as an image-load fallback. See [fridge illustration](./docs/design/fridge-illustration.md) for the reference and structure.
 
@@ -74,15 +74,15 @@ Phase 4 uses online Firebase Authentication even when PostgreSQL runs locally. T
 
 The Firebase CLI configuration used for this local setup is kept under the ignored `.local/firebase-config/` directory so the OAuth support email stays out of commits. Use an explicit `--config .local/firebase-config/firebase.json` path when updating that provider from this checkout.
 
-Create a home, invite a second Google account by its email, and sign in from `/app` in another browser profile with that account. The home appears automatically in the switcher. A third account cannot open it. The creator can rename and remove members; a member can leave. Creator departure and ownership transfer are intentionally unavailable.
+Create a home, invite a second Google account by its email, and sign in from `/app` in another browser profile with that account. The home appears automatically in the switcher. A third account cannot open it. The creator can rename and remove members; a member can leave. Creator departure and ownership transfer are intentionally unavailable. Post text notes from both accounts: each appears on the other's fridge within a few seconds and survives reload. Any member can move, edit, grey out, or undo any note.
 
-The server verifies Firebase ID tokens for every home request and checks current PostgreSQL membership. The first home API client is in `packages/api-client`; the home screens are in `packages/fridge-ui`. The Next.js app supplies Firebase authentication and HTTP routes. A user who loses membership cannot read that home on the next request. The UI refreshes visible home membership every 15 seconds and on focus.
+The server verifies Firebase ID tokens for every home request and checks current PostgreSQL membership. The first home API client is in `packages/api-client`; the home screens are in `packages/fridge-ui`. The Next.js app supplies Firebase authentication and HTTP routes. A user who loses membership cannot read that home on the next request. The UI refreshes visible home membership every 15 seconds and on focus; the open fridge polls for shared notes every 5 seconds and on focus.
 
-Run the local PostgreSQL integration check after migrations:
+Run the local PostgreSQL integration checks after migrations:
 
 ```powershell
 $env:RUN_DB_TESTS='1'
-node --env-file=.env node_modules/vitest/vitest.mjs run packages/server/src/homes.test.ts
+node --env-file=.env node_modules/vitest/vitest.mjs run packages/server/src/homes.test.ts packages/server/src/posts.test.ts packages/database/src/maintenance.test.ts
 ```
 
 This check uses temporary, uniquely named records and removes them afterward. It does not need Firebase credentials; the live two-account review still does.
@@ -91,18 +91,19 @@ This check uses temporary, uniquely named records and removes them afterward. It
 
 ## Common commands
 
-| Command              | Purpose                                                                            |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| `pnpm local:setup`   | Create `.env` from the example when missing and prepare ignored local data folders |
-| `pnpm dev:services`  | Start local PostgreSQL and wait for it to become healthy                           |
-| `pnpm services:down` | Stop local services while preserving the database volume                           |
-| `pnpm dev`           | Run the Next.js app                                                                |
-| `pnpm dev:all`       | Start the normal local development stack                                           |
-| `pnpm db:generate`   | Generate a checked-in SQL migration after changing the Drizzle schema              |
-| `pnpm db:migrate`    | Apply pending migrations                                                           |
-| `pnpm db:seed`       | Upsert deterministic example users, home, memberships, and fridge board            |
-| `pnpm db:studio`     | Open Drizzle Studio for the local database                                         |
-| `pnpm check`         | Run formatting, lint, types, tests, and the production web build                   |
+| Command                 | Purpose                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `pnpm local:setup`      | Create `.env` from the example when missing and prepare ignored local data folders |
+| `pnpm dev:services`     | Start local PostgreSQL and wait for it to become healthy                           |
+| `pnpm services:down`    | Stop local services while preserving the database volume                           |
+| `pnpm dev`              | Run the Next.js app                                                                |
+| `pnpm dev:all`          | Start the normal local development stack                                           |
+| `pnpm db:generate`      | Generate a checked-in SQL migration after changing the Drizzle schema              |
+| `pnpm db:migrate`       | Apply pending migrations                                                           |
+| `pnpm db:seed`          | Upsert deterministic example users, home, memberships, and fridge board            |
+| `pnpm db:prune-expired` | Delete expired text posts (`-- --dry-run` only counts them)                        |
+| `pnpm db:studio`        | Open Drizzle Studio for the local database                                         |
+| `pnpm check`            | Run formatting, lint, types, tests, and the production web build                   |
 
 ## Local data
 

@@ -13,17 +13,7 @@ export function HomeSwitcher({
   onCreate: () => void;
   hideError?: boolean;
 }) {
-  const {
-    mode,
-    me,
-    busy,
-    error,
-    openingHomeId,
-    selectHome,
-    signIn,
-    signOut,
-    retry,
-  } = useHomes();
+  const { mode, me, busy, error, selectHome, signIn, signOut, retry } = useHomes();
   const ready = mode === "ready" && me;
   const displayName = me?.user.displayName || me?.user.email;
 
@@ -87,7 +77,6 @@ export function HomeSwitcher({
             <HomeGrid
               homes={ready.homes}
               busy={busy}
-              openingHomeId={openingHomeId}
               onSelectHome={selectHome}
               onCreate={onCreate}
             />

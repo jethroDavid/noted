@@ -16,6 +16,8 @@ export function PostModalFrame({
   onSubmit,
   saveLabel,
   saveDisabled = false,
+  saving = false,
+  actionError = null,
 }: Omit<PostModalProps, "assets" | "onSave"> & {
   title: string;
   children: ReactNode;
@@ -76,7 +78,7 @@ export function PostModalFrame({
           <button
             type="submit"
             className="primary-button"
-            disabled={saveDisabled}
+            disabled={saveDisabled || saving}
           >
             {saveLabel}
             <Icon name="arrow" size={17} />
@@ -120,6 +122,11 @@ export function PostModalFrame({
           </p>
         )}
         {!expired && children}
+        {actionError && (
+          <p className="modal-error" role="alert">
+            {actionError}
+          </p>
+        )}
         <footer className="modal-footer">{footerActions}</footer>
         {!isNew && !pending && (
           <p className="removal-footnote">

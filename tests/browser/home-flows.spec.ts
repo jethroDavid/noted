@@ -13,15 +13,34 @@ test.skip(
 );
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({
-      json: route.request().url().endsWith("/me")
-        ? fixtureMe
-        : { home: fixtureHome },
-    }),
-  );
+  await page.route("**/api/**", (route) => {
+    const url = route.request().url();
+    if (url.endsWith("/me")) {
+      return route.fulfill({ json: fixtureMe });
+    }
+    // Open homes load their board through the posts provider; these flows
+    // keep the fridge empty and focus on the surrounding home behavior.
+    if (url.includes("/boards/")) {
+      return route.fulfill({
+        json: {
+          board: {
+            id: fixtureHome.boardId,
+            homeId: fixtureHome.id,
+            postAdditions: 0,
+          },
+          posts: [],
+          serverTime: new Date().toISOString(),
+        },
+      });
+    }
+    return route.fulfill({ json: { home: fixtureHome } });
+  });
   await installBrowserSession(page);
 });
+
+function homeUrl(id: string) {
+  return new RegExp(`/app/homes/${id}$`);
+}
 
 test("signed-in users can keep playing, open the switcher, and sign out", async ({
   page,
@@ -49,6 +68,7 @@ test("home header actions use the shared secondary button", async ({
 }) => {
   await page.goto("/app/homes");
   await page.getByRole("button", { name: /The Sunday home/ }).click();
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
   const headerAction = page.locator(".app-header-action");
   await expect(
     headerAction.getByRole("button", { name: "Homes", exact: true }),
@@ -99,6 +119,7 @@ test("creation dialog handles failure, retries once, and opens the created fridg
     .getByRole("button", { name: "Create home", exact: true })
     .click();
   await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
   await expect(page.locator(".home-label")).toHaveAttribute(
     "title",
     "Our kitchen",
@@ -111,6 +132,7 @@ test("people dialog keeps the fridge in place, traps focus, and reports a saved 
 }) => {
   await page.goto("/app/homes");
   await page.getByRole("button", { name: /The Sunday home/ }).click();
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
   await page
     .locator(".fridge-stage")
     .evaluate((element) =>
@@ -151,6 +173,7 @@ test("people dialog keeps the fridge in place, traps focus, and reports a saved 
     page.getByRole("button", { name: "People", exact: true }),
   ).toBeFocused();
   await page.getByRole("button", { name: "Homes", exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/homes$/);
   await expect(page.getByRole("button", { name: /The kitchen/ })).toBeVisible();
 });
 
@@ -159,6 +182,7 @@ test("a late refresh cannot reopen a home after returning to the switcher", asyn
 }) => {
   await page.goto("/app/homes");
   await page.getByRole("button", { name: /The Sunday home/ }).click();
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
   await expect(
     page.getByRole("button", { name: "People", exact: true }),
   ).toBeVisible();
@@ -178,6 +202,7 @@ test("a late refresh cannot reopen a home after returning to the switcher", asyn
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await pending;
   await page.getByRole("button", { name: "Homes", exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/homes$/);
   const finished = page.waitForResponse((response) =>
     response.url().endsWith(fixtureHome.id),
   );
@@ -213,6 +238,7 @@ test("connection errors keep the fridge open; revoked membership closes it", asy
     route.fulfill({ status: 404, json: { error: "Home not found." } }),
   );
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page).toHaveURL(/\/app\/homes$/);
   await expect(
     page.getByRole("heading", { name: "Your homes." }),
   ).toBeVisible();
@@ -262,6 +288,8 @@ test("an expired session clears the private fridge and offers sign-in", async ({
   await expect(
     page.getByRole("button", { name: "Continue with Google" }),
   ).toBeEnabled();
+  // Expired sessions keep the home URL so sign-in returns to the same fridge.
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
   await expect(
     page.getByRole("button", { name: "People", exact: true }),
   ).toHaveCount(0);
@@ -374,6 +402,7 @@ test("leaving a home closes its dialog and returns to the remaining homes", asyn
     .getByRole("button", { name: "Leave this home" })
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app\/homes$/);
   await expect(
     page.getByRole("heading", { name: "Your homes." }),
   ).toBeVisible();
@@ -423,6 +452,7 @@ test("a failed rename keeps its draft; retry updates the shared fridge and switc
   );
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Homes", exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/homes$/);
   await expect(page.getByRole("button", { name: /Our kitchen/ })).toBeVisible();
 });
 
@@ -442,7 +472,87 @@ test("an expired session during an edit clears the dialog and private home", asy
   await expect(
     page.getByRole("button", { name: "Continue with Google" }),
   ).toBeEnabled();
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
   await expect(
     page.getByRole("alert").filter({ hasText: "sign-in expired" }),
+  ).toBeVisible();
+});
+
+test("a deep link loads the home directly", async ({ page }) => {
+  await page.goto(`/app/homes/${fixtureHome.id}`);
+  await expect(
+    page.getByRole("button", { name: "People", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".home-label")).toHaveAttribute(
+    "title",
+    fixtureHome.name,
+  );
+});
+
+test("an unknown home id redirects to the switcher with a notice", async ({
+  page,
+}) => {
+  await page.route("**/api/homes/no-such-home", (route) =>
+    route.fulfill({ status: 404, json: { error: "Home not found." } }),
+  );
+  await page.goto("/app/homes/no-such-home");
+  await expect(page).toHaveURL(/\/app\/homes$/);
+  await expect(
+    page.getByRole("heading", { name: "Your homes." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "no longer have access" }),
+  ).toBeVisible();
+});
+
+test("back and forward move between the switcher and an open home", async ({
+  page,
+}) => {
+  await page.goto("/app/homes");
+  await page.getByRole("button", { name: /The Sunday home/ }).click();
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
+  await expect(
+    page.getByRole("button", { name: "People", exact: true }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/app\/homes$/);
+  await expect(
+    page.getByRole("heading", { name: "Your homes." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "People", exact: true }),
+  ).toHaveCount(0);
+  await page.goForward();
+  await expect(page).toHaveURL(homeUrl(fixtureHome.id));
+  await expect(
+    page.getByRole("button", { name: "People", exact: true }),
+  ).toBeVisible();
+});
+
+test("the home route offers a retry when the initial load fails", async ({
+  page,
+}) => {
+  let fail = true;
+  await page.route(`**/api/homes/${fixtureHome.id}`, (route) =>
+    route.fulfill(
+      fail
+        ? { status: 503, json: { error: "Temporarily unavailable" } }
+        : { json: { home: fixtureHome } },
+    ),
+  );
+  await page.goto(`/app/homes/${fixtureHome.id}`);
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Temporarily unavailable" }),
+  ).toHaveText("Temporarily unavailable");
+  await expect(
+    page.getByRole("button", { name: "Try again", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Back to homes", exact: true }),
+  ).toBeVisible();
+  fail = false;
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "People", exact: true }),
   ).toBeVisible();
 });

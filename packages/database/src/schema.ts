@@ -113,6 +113,7 @@ export const boards = pgTable(
       .notNull()
       .references(() => homes.id, { onDelete: "cascade", onUpdate: "cascade" }),
     kind: boardKind("kind").notNull().default("fridge"),
+    postAdditions: integer("post_additions").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -12,8 +12,8 @@ export function makeHomesQueryClient() {
         // Loads fail fast into error mode with a manual retry(); no hidden retries.
         retry: false,
         // Mutations write their response straight into the cache, so freshly
-        // written data must count as fresh: enabling the home query after a
-        // select must not refetch and clobber the response just written.
+        // written data must count as fresh: opening the route for a home that
+        // was just written must not refetch and clobber the response.
         staleTime: 15_000,
         // Mutations write their response straight into the cache, so a query
         // that already has data must not refetch just because it remounted.

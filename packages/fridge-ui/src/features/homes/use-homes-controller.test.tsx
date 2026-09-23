@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ApiError, type NotedApiClient } from "@noted/api-client";
-import type { HomeDetail, MeResponse } from "@noted/contracts";
+import type {
+  BoardPost,
+  BoardPostsResponse,
+  HomeDetail,
+  MeResponse,
+} from "@noted/contracts";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +47,26 @@ const meAccount2: MeResponse = {
   homes: [homeB],
 };
 
+const postFixture: BoardPost = {
+  id: "post-1",
+  boardId: "board-a",
+  kind: "text",
+  text: "Oat milk",
+  foregroundColor: "#33352e",
+  backgroundColor: "#f5dfa0",
+  x: 0.3,
+  y: 0.4,
+  createdAt: "2026-09-21T10:00:00.000Z",
+  updatedAt: "2026-09-21T10:05:00.000Z",
+  deletionRequestedAt: null,
+  deleteAfter: null,
+};
+const boardFixture: BoardPostsResponse = {
+  board: { id: "board-a", homeId: "home-a", postAdditions: 1 },
+  posts: [postFixture],
+  serverTime: "2026-09-21T11:30:00.000Z",
+};
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (cause?: unknown) => void;
@@ -68,6 +93,22 @@ function makeApi() {
     invite: vi.fn(async (id: string) => ({ home: { ...homeA, id } })),
     removeMember: vi.fn(async (id: string) => ({ home: { ...homeA, id } })),
     leaveHome: vi.fn(async () => ({ homes: [homeB] })),
+    boardPosts: vi.fn(async (): Promise<BoardPostsResponse> => boardFixture),
+    createPost: vi.fn(async (): Promise<{ post: BoardPost }> => ({
+      post: postFixture,
+    })),
+    editPost: vi.fn(async (): Promise<{ post: BoardPost }> => ({
+      post: postFixture,
+    })),
+    movePost: vi.fn(async (): Promise<{ post: BoardPost }> => ({
+      post: postFixture,
+    })),
+    requestRemoval: vi.fn(async (): Promise<{ post: BoardPost }> => ({
+      post: postFixture,
+    })),
+    undoRemoval: vi.fn(async (): Promise<{ post: BoardPost }> => ({
+      post: postFixture,
+    })),
   } satisfies NotedApiClient;
 }
 
@@ -109,24 +150,48 @@ function makeAuth() {
   };
 }
 
-function renderController() {
+function renderController(initialHomeId: string | null = null) {
   const queryClient = makeHomesQueryClient();
   const api = makeApi();
   const fake = makeAuth();
   const onSignedOut = vi.fn();
+  const onOpenHome = vi.fn();
+  const onBackToHomes = vi.fn();
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
   const rendered = renderHook(
-    () => useHomesController(api, fake.auth, onSignedOut),
-    { wrapper },
+    ({ homeId }: { homeId: string | null }) =>
+      useHomesController(api, fake.auth, onSignedOut, {
+        homeId,
+        onOpenHome,
+        onBackToHomes,
+      }),
+    { wrapper, initialProps: { homeId: initialHomeId } },
   );
-  return { ...rendered, queryClient, api, fake, onSignedOut };
+  return {
+    ...rendered,
+    queryClient,
+    api,
+    fake,
+    onSignedOut,
+    onOpenHome,
+    onBackToHomes,
+    setHomeId(id: string | null) {
+      rendered.rerender({ homeId: id });
+    },
+  };
 }
 
-async function renderReady() {
-  const harness = renderController();
+async function renderReady(homeId: string | null = null) {
+  const harness = renderController(homeId);
   harness.fake.emit("account-1");
   await waitFor(() => expect(harness.result.current.mode).toBe("ready"));
+  return harness;
+}
+
+async function renderOpenHome(homeId = "home-a") {
+  const harness = await renderReady(homeId);
+  await waitFor(() => expect(harness.result.current.home?.id).toBe(homeId));
   return harness;
 }
 
@@ -192,48 +257,51 @@ describe("homes controller", () => {
     expect(harness.result.current.me).toBeNull();
   });
 
-  it("select opens the home and merges it into the switcher list", async () => {
+  it("select navigates to the home route without fetching", async () => {
     const harness = await renderReady();
-    const gate = deferred<{ home: HomeDetail }>();
-    harness.api.home.mockReturnValueOnce(gate.promise);
-    let saved!: Promise<boolean>;
-    act(() => {
-      saved = harness.result.current.selectHome("home-a");
-    });
-    expect(harness.result.current.busy).toBe(true);
-    expect(harness.result.current.openingHomeId).toBe("home-a");
-
-    const renamed = { ...homeA, name: "The Sunday home (renamed)" };
+    let saved = false;
     await act(async () => {
-      gate.resolve({ home: renamed });
-      await saved;
+      saved = await harness.result.current.selectHome("home-a");
     });
-    expect(await saved).toBe(true);
-    expect(harness.result.current.home).toEqual(renamed);
-    expect(harness.result.current.me?.homes).toEqual([renamed]);
+    expect(saved).toBe(true);
+    expect(harness.onOpenHome).toHaveBeenCalledTimes(1);
+    expect(harness.onOpenHome).toHaveBeenCalledWith("home-a");
+    expect(harness.api.home).not.toHaveBeenCalled();
+    expect(harness.result.current.home).toBeNull();
     expect(harness.result.current.busy).toBe(false);
-    expect(harness.result.current.openingHomeId).toBeNull();
   });
 
-  it("create opens the new home and lists it once", async () => {
+  it("a route id loads its home from the server", async () => {
+    const harness = await renderReady();
+    expect(harness.result.current.home).toBeNull();
+    expect(harness.api.home).not.toHaveBeenCalled();
+    harness.setHomeId("home-b");
+    await waitFor(() => expect(harness.result.current.home).toEqual(homeB));
+    expect(harness.api.home).toHaveBeenCalledWith("home-b");
+  });
+
+  it("create lists the new home once and navigates to it", async () => {
     const harness = await renderReady();
     let saved = false;
     await act(async () => {
       saved = await harness.result.current.createHome("Our kitchen");
     });
     expect(saved).toBe(true);
-    expect(harness.result.current.home?.name).toBe("Our kitchen");
+    expect(harness.onOpenHome).toHaveBeenCalledWith("home-new");
     expect(harness.result.current.me?.homes.map((home) => home.name)).toEqual([
       "The Sunday home",
       "Our kitchen",
     ]);
+    // Navigation lands: the new id loads from the written cache, not the server.
+    harness.setHomeId("home-new");
+    await waitFor(() =>
+      expect(harness.result.current.home?.name).toBe("Our kitchen"),
+    );
+    expect(harness.api.home).not.toHaveBeenCalled();
   });
 
   it("rename updates the fridge and switcher together without duplicating", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     let saved = false;
     await act(async () => {
       saved = await harness.result.current.renameHome("home-a", "Our kitchen");
@@ -245,10 +313,7 @@ describe("homes controller", () => {
   });
 
   it("invite and remove write the returned home", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     const invited = {
       ...homeA,
       pendingInvitations: [
@@ -290,26 +355,21 @@ describe("homes controller", () => {
   });
 
   it("leave closes the home and keeps the remaining list without refetching", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     const meCalls = harness.api.me.mock.calls.length;
     let saved = false;
     await act(async () => {
       saved = await harness.result.current.leaveHome("home-a");
     });
     expect(saved).toBe(true);
+    expect(harness.onBackToHomes).toHaveBeenCalledTimes(1);
     expect(harness.result.current.home).toBeNull();
     expect(harness.result.current.me?.homes).toEqual([homeB]);
     expect(harness.api.me.mock.calls.length).toBe(meCalls);
   });
 
   it("a failed operation reports its message and preserves the open home", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     harness.api.renameHome.mockRejectedValueOnce(
       new ApiError(503, "Please retry the name change."),
     );
@@ -331,10 +391,7 @@ describe("homes controller", () => {
   });
 
   it("an expired session during an edit signs out without navigating", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     harness.api.renameHome.mockRejectedValueOnce(
       new ApiError(401, "Session expired."),
     );
@@ -350,68 +407,57 @@ describe("homes controller", () => {
     expect(harness.result.current.me).toBeNull();
     expect(harness.result.current.home).toBeNull();
     expect(harness.onSignedOut).not.toHaveBeenCalled();
+    expect(harness.onBackToHomes).not.toHaveBeenCalled();
   });
 
-  it("overlapping selects resolve once and the latest wins", async () => {
-    const harness = await renderReady();
-    const first = deferred<{ home: HomeDetail }>();
-    const second = deferred<{ home: HomeDetail }>();
-    harness.api.home
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
-    let firstSaved!: Promise<boolean>;
-    let secondSaved!: Promise<boolean>;
-    act(() => {
-      firstSaved = harness.result.current.selectHome("home-a");
-    });
-    act(() => {
-      secondSaved = harness.result.current.selectHome("home-b");
-    });
-    expect(harness.result.current.openingHomeId).toBe("home-b");
-    expect(harness.result.current.busy).toBe(true);
-
-    await act(async () => {
-      first.resolve({ home: homeA });
-      await firstSaved;
-    });
-    expect(await firstSaved).toBe(false);
-    expect(harness.result.current.home).toBeNull();
-    await act(async () => {
-      second.resolve({ home: homeB });
-      await secondSaved;
-    });
-    expect(await secondSaved).toBe(true);
-    expect(harness.result.current.home).toEqual(homeB);
-    expect(harness.result.current.busy).toBe(false);
-    expect(harness.result.current.openingHomeId).toBeNull();
-  });
-
-  it("backToHomes drops a late select result", async () => {
-    const harness = await renderReady();
+  it("a home change drops a late rename result", async () => {
+    const harness = await renderOpenHome("home-a");
     const gate = deferred<{ home: HomeDetail }>();
-    harness.api.home.mockReturnValueOnce(gate.promise);
+    harness.api.renameHome.mockReturnValueOnce(gate.promise);
     let saved!: Promise<boolean>;
     act(() => {
-      saved = harness.result.current.selectHome("home-a");
+      saved = harness.result.current.renameHome("home-a", "Our kitchen");
     });
-    act(() => harness.result.current.backToHomes());
+    expect(harness.result.current.busy).toBe(true);
+    harness.setHomeId("home-b");
     await act(async () => {
-      gate.resolve({ home: homeA });
+      gate.resolve({ home: { ...homeA, name: "Our kitchen" } });
       await saved;
     });
     expect(await saved).toBe(false);
+    expect(harness.result.current.error).toBeNull();
+    await waitFor(() => expect(harness.result.current.busy).toBe(false));
+    await waitFor(() => expect(harness.result.current.home).toEqual(homeB));
+  });
+
+  it("backToHomes drops a late rename result and navigates", async () => {
+    const harness = await renderOpenHome("home-a");
+    const gate = deferred<{ home: HomeDetail }>();
+    harness.api.renameHome.mockReturnValueOnce(gate.promise);
+    let saved!: Promise<boolean>;
+    act(() => {
+      saved = harness.result.current.renameHome("home-a", "Our kitchen");
+    });
+    act(() => harness.result.current.backToHomes());
+    expect(harness.onBackToHomes).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      gate.resolve({ home: { ...homeA, name: "Our kitchen" } });
+      await saved;
+    });
+    expect(await saved).toBe(false);
+    expect(harness.result.current.error).toBeNull();
+    harness.setHomeId(null);
     expect(harness.result.current.home).toBeNull();
     expect(harness.result.current.mode).toBe("ready");
-    expect(harness.result.current.openingHomeId).toBeNull();
   });
 
   it("an account switch never flashes the previous account", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     const gate = deferred<MeResponse>();
     harness.api.me.mockReturnValueOnce(gate.promise);
+    harness.api.home.mockRejectedValueOnce(
+      new ApiError(404, "Home not found."),
+    );
     harness.fake.emit("account-2");
     expect(harness.result.current.mode).toBe("loading");
     expect(harness.result.current.me).toBeNull();
@@ -422,23 +468,30 @@ describe("homes controller", () => {
       await gate.promise;
     });
     await waitFor(() => expect(harness.result.current.me).toEqual(meAccount2));
+    await waitFor(() => expect(harness.onBackToHomes).toHaveBeenCalledTimes(1));
     expect(harness.result.current.mode).toBe("ready");
     expect(harness.result.current.home).toBeNull();
+    expect(harness.result.current.error).toBe(
+      "You no longer have access to that home.",
+    );
   });
 
   it("mutation results from an old account are dropped", async () => {
-    const harness = await renderReady();
+    const harness = await renderOpenHome("home-a");
     const gate = deferred<{ home: HomeDetail }>();
-    harness.api.home.mockReturnValueOnce(gate.promise);
+    harness.api.renameHome.mockReturnValueOnce(gate.promise);
     let saved!: Promise<boolean>;
     act(() => {
-      saved = harness.result.current.selectHome("home-a");
+      saved = harness.result.current.renameHome("home-a", "Our kitchen");
     });
     harness.api.me.mockResolvedValueOnce(meAccount2);
+    harness.api.home.mockRejectedValueOnce(
+      new ApiError(404, "Home not found."),
+    );
     harness.fake.emit("account-2");
     await waitFor(() => expect(harness.result.current.me).toEqual(meAccount2));
     await act(async () => {
-      gate.resolve({ home: homeA });
+      gate.resolve({ home: { ...homeA, name: "Our kitchen" } });
       await saved;
     });
     expect(await saved).toBe(false);
@@ -447,17 +500,13 @@ describe("homes controller", () => {
   });
 
   it("a sign-out event clears private data and pending UI", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     harness.fake.emit(undefined);
     expect(harness.result.current).toMatchObject({
       mode: "signed-out",
       me: null,
       home: null,
       busy: false,
-      openingHomeId: null,
       error: null,
     });
   });
@@ -535,10 +584,7 @@ describe("homes controller", () => {
   });
 
   it("a background failure keeps the fridge open behind a banner", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     harness.api.me.mockRejectedValueOnce(new ApiError(503, "Unavailable"));
     await act(async () => {
       await harness.queryClient.invalidateQueries({
@@ -562,10 +608,7 @@ describe("homes controller", () => {
   });
 
   it("revoked membership closes the home once and prunes the list", async () => {
-    const harness = await renderReady();
-    await act(async () => {
-      await harness.result.current.selectHome("home-a");
-    });
+    const harness = await renderOpenHome("home-a");
     harness.api.home.mockRejectedValueOnce(
       new ApiError(404, "Home not found."),
     );
@@ -580,11 +623,18 @@ describe("homes controller", () => {
     expect(harness.result.current.error).toBe(
       "You no longer have access to that home.",
     );
+    expect(harness.onBackToHomes).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await harness.result.current.createHome("A fresh start");
     });
+    expect(harness.onOpenHome).toHaveBeenCalledWith("home-new");
     expect(harness.result.current.error).toBeNull();
-    expect(harness.result.current.home?.name).toBe("A fresh start");
+    const homeCalls = harness.api.home.mock.calls.length;
+    harness.setHomeId("home-new");
+    await waitFor(() =>
+      expect(harness.result.current.home?.name).toBe("A fresh start"),
+    );
+    expect(harness.api.home.mock.calls.length).toBe(homeCalls);
   });
 });

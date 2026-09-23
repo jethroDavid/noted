@@ -1,9 +1,16 @@
 import {
+  boardPostsResponseSchema,
   homeResponseSchema,
   homesResponseSchema,
   meResponseSchema,
+  postResponseSchema,
+  type BoardPost,
+  type BoardPostsResponse,
+  type CreatePostInput,
   type HomeDetail,
   type MeResponse,
+  type UpdatePostContentInput,
+  type UpdatePostPositionInput,
 } from "@noted/contracts";
 
 type Schema<T> = { parse(value: unknown): T };
@@ -62,6 +69,8 @@ export function createApiClient(options: {
   }
 
   const homePath = (id: string) => `/homes/${encodeURIComponent(id)}`;
+  const boardPath = (homeId: string, boardId: string) => `${homePath(homeId)}/boards/${encodeURIComponent(boardId)}`;
+  const postPath = (homeId: string, postId: string) => `${homePath(homeId)}/posts/${encodeURIComponent(postId)}`;
 
   return {
     me: (requestOptions?: ApiRequestOptions) =>
@@ -118,8 +127,83 @@ export function createApiClient(options: {
         undefined,
         requestOptions,
       ),
+    boardPosts: (
+      homeId: string,
+      boardId: string,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        boardPath(homeId, boardId),
+        boardPostsResponseSchema,
+        "GET",
+        undefined,
+        requestOptions,
+      ),
+    createPost: (
+      homeId: string,
+      boardId: string,
+      input: CreatePostInput,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        `${boardPath(homeId, boardId)}/posts`,
+        postResponseSchema,
+        "POST",
+        input,
+        requestOptions,
+      ),
+    editPost: (
+      homeId: string,
+      postId: string,
+      input: UpdatePostContentInput,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        postPath(homeId, postId),
+        postResponseSchema,
+        "PATCH",
+        input,
+        requestOptions,
+      ),
+    movePost: (
+      homeId: string,
+      postId: string,
+      input: UpdatePostPositionInput,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        `${postPath(homeId, postId)}/position`,
+        postResponseSchema,
+        "PATCH",
+        input,
+        requestOptions,
+      ),
+    requestRemoval: (
+      homeId: string,
+      postId: string,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        `${postPath(homeId, postId)}/removal`,
+        postResponseSchema,
+        "POST",
+        undefined,
+        requestOptions,
+      ),
+    undoRemoval: (
+      homeId: string,
+      postId: string,
+      requestOptions?: ApiRequestOptions,
+    ) =>
+      request(
+        `${postPath(homeId, postId)}/removal`,
+        postResponseSchema,
+        "DELETE",
+        undefined,
+        requestOptions,
+      ),
   };
 }
 
 export type NotedApiClient = ReturnType<typeof createApiClient>;
-export type { HomeDetail, MeResponse };
+export type { BoardPost, BoardPostsResponse, HomeDetail, MeResponse };

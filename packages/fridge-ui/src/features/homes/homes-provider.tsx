@@ -12,17 +12,30 @@ export function HomesProvider({
   api,
   auth,
   onSignedOut,
+  homeId = null,
+  onOpenHome,
+  onBackToHomes,
   children,
 }: {
   api: NotedApiClient;
   auth: HomesAuth;
   onSignedOut?: () => void;
+  homeId?: string | null;
+  onOpenHome?: (id: string) => void;
+  onBackToHomes?: () => void;
   children?: ReactNode;
 }) {
   const [queryClient] = useState(() => makeHomesQueryClient());
   return (
     <QueryClientProvider client={queryClient}>
-      <HomesControllerHost api={api} auth={auth} onSignedOut={onSignedOut}>
+      <HomesControllerHost
+        api={api}
+        auth={auth}
+        onSignedOut={onSignedOut}
+        homeId={homeId}
+        onOpenHome={onOpenHome}
+        onBackToHomes={onBackToHomes}
+      >
         {children}
       </HomesControllerHost>
     </QueryClientProvider>
@@ -33,13 +46,23 @@ function HomesControllerHost({
   api,
   auth,
   onSignedOut,
+  homeId,
+  onOpenHome,
+  onBackToHomes,
   children,
 }: {
   api: NotedApiClient;
   auth: HomesAuth;
   onSignedOut?: () => void;
+  homeId: string | null;
+  onOpenHome?: (id: string) => void;
+  onBackToHomes?: () => void;
   children?: ReactNode;
 }) {
-  const homes = useHomesController(api, auth, onSignedOut);
+  const homes = useHomesController(api, auth, onSignedOut, {
+    homeId,
+    onOpenHome,
+    onBackToHomes,
+  });
   return <HomesContext value={homes}>{children}</HomesContext>;
 }

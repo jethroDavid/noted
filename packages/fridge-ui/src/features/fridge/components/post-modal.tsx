@@ -13,6 +13,8 @@ export type PostModalProps = {
   onSave: (post: Post) => void;
   onRemove: (id: string) => void;
   onUndo: (id: string) => void;
+  saving?: boolean;
+  actionError?: string | null;
 };
 
 export function PostModal(props: PostModalProps) {

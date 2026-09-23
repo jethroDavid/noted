@@ -37,7 +37,10 @@ export function FlatFridge() {
           stroke={ink}
           strokeWidth="4"
         />
-        <path d="M78,360 H600 V390 Q600,398 592,398 H86 Q78,398 78,390 Z" fill="#d9c69e" />
+        <path
+          d="M78,360 H600 V390 Q600,398 592,398 H86 Q78,398 78,390 Z"
+          fill="#d9c69e"
+        />
         <rect x="78" y="401" width="522" height="12" rx="6" fill="#4a4234" />
         <rect
           className="fridge-flat-door"
@@ -50,7 +53,10 @@ export function FlatFridge() {
           stroke={ink}
           strokeWidth="4"
         />
-        <path d="M78,830 H600 V884 Q600,892 592,892 H86 Q78,892 78,884 Z" fill="#d9c69e" />
+        <path
+          d="M78,830 H600 V884 Q600,892 592,892 H86 Q78,892 78,884 Z"
+          fill="#d9c69e"
+        />
 
         {/* Gray handles with a light core. */}
         <rect
@@ -63,7 +69,15 @@ export function FlatFridge() {
           stroke={ink}
           strokeWidth="4"
         />
-        <rect x="104" y="106" width="6" height="180" rx="3" fill="#e8ecec" opacity="0.85" />
+        <rect
+          x="104"
+          y="106"
+          width="6"
+          height="180"
+          rx="3"
+          fill="#e8ecec"
+          opacity="0.85"
+        />
         <rect
           x="98"
           y="448"
@@ -74,7 +88,15 @@ export function FlatFridge() {
           stroke={ink}
           strokeWidth="4"
         />
-        <rect x="104" y="458" width="6" height="240" rx="3" fill="#e8ecec" opacity="0.85" />
+        <rect
+          x="104"
+          y="458"
+          width="6"
+          height="240"
+          rx="3"
+          fill="#e8ecec"
+          opacity="0.85"
+        />
 
         {/* Solid dark kick plate. */}
         <rect x="110" y="908" width="400" height="26" rx="10" fill="#4a4234" />

@@ -26,7 +26,7 @@ test("home switcher explains setup or offers Google sign-in", async ({
       )
       .or(page.getByRole("button", { name: "Continue with Google" })),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Playground", exact: true }).click();
+  await page.getByRole("link", { name: "Noted playground" }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(
     page.getByRole("heading", { name: "On the fridge." }),

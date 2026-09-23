@@ -1,5 +1,5 @@
-import { WebHomeApp } from "@/features/homes/web-home-app";
+import { WebHomesSwitcher } from "@/features/homes/web-homes-switcher";
 
 export default function HomesPage() {
-  return <WebHomeApp />;
+  return <WebHomesSwitcher />;
 }

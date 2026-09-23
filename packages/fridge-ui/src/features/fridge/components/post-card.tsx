@@ -23,6 +23,9 @@ export type PostCardProps = {
   select: (id: string | null) => void;
   move: (id: string, position: Position) => void;
   open: (post: Post) => void;
+  /** Connected fridges preview moves locally and commit on release. */
+  commitMove?: (id: string) => void;
+  cancelMove?: (id: string) => void;
 };
 
 export function PostCard({
@@ -34,6 +37,8 @@ export function PostCard({
   select,
   move,
   open,
+  commitMove,
+  cancelMove,
 }: PostCardProps & { children: ReactNode; label: string }) {
   const drag = useRef<{
     pointerId: number;
@@ -87,8 +92,11 @@ export function PostCard({
     const active = drag.current;
     if (!active || active.pointerId !== event.pointerId) return;
     if (canceled) {
-      move(post.id, active.start);
+      if (cancelMove) cancelMove(post.id);
+      else move(post.id, active.start);
       suppressClick.current = true;
+    } else if (active.moved) {
+      commitMove?.(post.id);
     }
     drag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
@@ -121,6 +129,7 @@ export function PostCard({
         post.kind,
       ),
     );
+    commitMove?.(post.id);
   }
 
   return (
