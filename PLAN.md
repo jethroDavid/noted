@@ -1,12 +1,12 @@
 # Noted: product and implementation plan
 
-Updated: 2026-09-18
+Updated: 2026-09-20
 
-Status: active implementation. Phases 0-3 are complete; the Phase 2 prototype still needs physical-device review. Phase 3 established the shared frontend boundary before authentication or persistence work begins. This document records the agreed vision and implementation defaults. Build one phase at a time and review the working result before extending it.
+Status: active implementation. Phases 0-3 are complete; the Phase 2 prototype still needs physical-device review. Phase 4 code is implemented locally and a real Firebase project is connected; live sign-in and the two-account walkthrough remain open. Phase 5 code is implemented locally against the local database; the live two-account shared-notes walkthrough is its remaining gate. This document records the agreed vision and implementation defaults. Build one phase at a time and review the working result before extending it.
 
 ## Start here: phase-by-phase roadmap
 
-**Current progress:** Phases 0-3 are complete. The fridge now runs from a shared React package through the Next.js shell, with desktop and emulated-touch checks. **Next: Phase 4 introduces identity, homes, invitations, and the first real shared API client.** Physical-phone review from Phase 2 remains open.
+**Current progress:** Phases 0-3 are complete. Phase 4 adds the real Firebase integration, homes, invitations, and the first shared API client. Local database behavior is verified, and the Firebase web app and Google provider are configured. Live account review is still needed before its exit criteria are met. Phase 5 persists shared text notes with polling and server-authoritative slow removal; local database, unit, and browser behavior is verified, and the live two-account walkthrough remains. Physical-phone review from Phase 2 remains open.
 
 Each phase has its own task checklist and completion criteria in [the detailed phase plans](#11-phased-delivery). Complete and review one working milestone before moving to the next. Check off tasks only after implementation and verification.
 
@@ -16,8 +16,8 @@ Each phase has its own task checklist and completion criteria in [the detailed p
 | 1 | Monorepo and local foundation | Next.js, local PostgreSQL, Drizzle, migrations, and checks run together | Complete |
 | 2 | 3D fridge and touch interaction | Move fixture posts and edit through modals on desktop and phone layouts | Implemented; physical-phone review pending |
 | 3 | Shared frontend foundation | Next.js renders the fridge from a reusable React package | Complete |
-| 4 | Identity, homes, and invitations | Invited users automatically see their homes through the first shared API client | Not started |
-| 5 | Persistent shared text notes | Two users share notes, positions, polling, and one-hour removal with Undo | Not started |
+| 4 | Identity, homes, and invitations | Invited users automatically see their homes through the first shared API client | Implemented locally; real Firebase review pending |
+| 5 | Persistent shared text notes | Two users share notes, positions, polling, and one-hour removal with Undo | Implemented locally; live two-account review pending |
 | 6 | Images and voice notes | Complete local alpha-alpha prototype | Not started |
 | 7 | First deployment | Hosted web app using Neon, real Google sign-in, and private media storage | Not started |
 | 8A | WebSockets | Members see saved changes without waiting for a poll | Later |
@@ -37,7 +37,7 @@ A shared home with a refrigerator covered in notes, photographs, and voice messa
 
 The first app is a browser experience built with Next.js. It is also a portfolio and learning project: establish a reusable React frontend and a simple working foundation, improve the backend through concrete features, then add Electron desktop and Capacitor mobile applications around that same frontend. Shared rooms, a real-world neighborhood map, chat, and family activities are longer-term possibilities.
 
-The refrigerator is visible directly after entering a home. There is no door-opening interaction. Start in 3D, viewed mostly from the front with a little depth. Keep the composition warm, readable, and casual rather than visually busy.
+The refrigerator is visible directly after entering a home. There is no door-opening interaction. Render it flat, viewed from the front with a little illustrated depth. Keep the composition warm, readable, and casual rather than visually busy.
 
 Noted is the repository name. The public product name is undecided.
 
@@ -68,14 +68,14 @@ Noted is the repository name. The public product name is undecided.
 | Position | Shared between members; moving only, no resizing or rotation controls |
 | Layers | New posts appear above older posts |
 | Selection | Clicking/tapping brings a post forward locally to interact with it; no shared arrangement change |
-| Editing UI | A modal outside the 3D scene |
+| Editing UI | A modal above the fridge illustration |
 | Touch | Required from the beginning |
 | Removal | Greyed-out shared state for one hour; any member can undo before expiry |
 | Updates | Polling first; WebSockets later |
 | Future map | Real-world map; public home name and pin by default; private fridge contents |
 | Map position | One shared position per home; placement near the creator's reported device location |
 
-Earlier suggestions for secret words, invitation codes, acceptance buttons, five-second deletion, first-save-wins conflict handling, and a 2D-first fridge are superseded.
+Earlier suggestions for secret words, invitation codes, acceptance buttons, five-second deletion, and first-save-wins conflict handling are superseded. The fridge renders flat (see [the flat render decision](./docs/decisions/0004-flat-fridge-render.md)); the earlier 3D direction is superseded.
 
 ## 3. Proposed implementation defaults
 
@@ -83,7 +83,7 @@ These are adjustable starting choices, not additional requirements from the user
 
 - Use pnpm workspaces, one lockfile, and a pinned package-manager version. Use workspace scripts initially; introduce a task orchestrator only when it solves an actual coordination problem.
 - Use the Next.js App Router and Node.js server runtime for database, authentication verification, and local file access.
-- Use Three.js through React Three Fiber for the shared web-based fridge. Verify it in Next.js, Electron's renderer, and Capacitor's WebView when those shells are added; do not select preview releases by default.
+- Render the shared fridge as a flat illustration: a painted fridge image over a matching kitchen background, with the inline SVG kept only as an image-load fallback. Verify it in Next.js, Electron's renderer, and Capacitor's WebView when those shells are added.
 - Use a real Firebase project for Google sign-in during local development when identity work begins in Phase 4.
 - Use local PostgreSQL through Docker Compose and a persistent volume. Check Docker availability before setup; a native local PostgreSQL installation is an acceptable fallback.
 - Use one process-level `pg` connection pool with Drizzle's node-postgres adapter. No Redis or local PgBouncer service initially.
@@ -111,7 +111,7 @@ These are adjustable starting choices, not additional requirements from the user
 
 Local PostgreSQL is fully compatible with this approach. It does not need to emulate Neon's infrastructure. Keep to ordinary PostgreSQL features, align supported database versions, and apply the same checked-in migrations to each environment. Test migrations and application behavior against Neon before declaring a deployment ready.
 
-Phases 1-3 do not require a Firebase project. Starting in Phase 4, local development uses the real online Firebase Authentication service and real Google accounts. Keep PostgreSQL and media local until deployment. Bundle fonts and 3D assets locally. The future map may use online map tiles; offline tile support is not part of the alpha.
+Phases 1-3 do not require a Firebase project. Starting in Phase 4, local development uses the real online Firebase Authentication service and real Google accounts. Keep PostgreSQL and media local until deployment. Bundle fonts and illustration assets locally. The future map may use online map tiles; offline tile support is not part of the alpha.
 
 Phone testing needs a reachable development origin. Camera/microphone and authentication behavior must be tested over a suitable secure origin; ordinary HTTP at a computer's LAN address is not equivalent to localhost on that phone. Plan a local HTTPS certificate and device trust setup when testing on physical phones.
 
@@ -145,7 +145,7 @@ noted/
     realtime/                       # future persistent WebSocket service
     worker/                         # future background job runner
   packages/
-    fridge-ui/                      # shared React UI, 3D scene, interactions, and styles
+    fridge-ui/                      # shared React UI, fridge illustration, interactions, and styles
     contracts/                      # request/response schemas and public types
     domain/                         # pure rules and shared constants
     api-client/                     # typed HTTP calls, introduced with the first real API
@@ -158,14 +158,18 @@ noted/
   .local/                           # ignored local uploads
 ```
 
-Create a package when it contains real responsibilities. The completed fridge prototype makes the frontend boundary concrete, so Phase 3 extracts it into `packages/fridge-ui` before more features are added. The package contains the existing React UI, 3D scene, interaction code, tests, and scoped styles. `apps/web` remains the Next.js route and platform shell that renders that package.
+Create a package when it contains real responsibilities. The completed fridge prototype makes the frontend boundary concrete, so Phase 3 extracts it into `packages/fridge-ui` before more features are added. The package contains the existing React UI, fridge illustration, interaction code, tests, and scoped styles. `apps/web` remains the Next.js route and platform shell that renders that package.
 
 Phase 3 does not invent backend traffic merely to populate `api-client`. Phase 4 introduces `contracts`, `api-client`, and server operations together around the first real identity/home HTTP endpoints. From that point forward, the web frontend uses the same API client that Electron and Capacitor will use later.
 
 ### Dependency rules
 
+The shared frontend now uses the feature hierarchy documented in [the frontend architecture guide](docs/architecture/frontend.md). Home components, controller, queries, and cache keys live together in `packages/fridge-ui/src/features/homes`. `HomesProvider` owns one controller; descendant components read it with `useHomes()`. Operations use named functions and explicit `async/await` steps. Fridge code lives in `features/fridge`, and common visual primitives live in `ui`.
+
+Web-specific Firebase configuration and the authentication adapter live in `apps/web/src/platform/auth`; API configuration lives in `platform/api`. The shared controller receives those capabilities through the provider. Native shells will supply their implementations at the same boundary.
+
 - The Next.js web shell, Electron renderer, and Capacitor application render `fridge-ui`; they do not maintain copies of the fridge interface.
-- `fridge-ui` is a React DOM package. It may use browser standards and React Three Fiber, but it must not import Next.js, Electron, Capacitor, database, or privileged server modules.
+- `fridge-ui` is a React DOM package. It may use browser standards and inline SVG, but it must not import Next.js, Firebase SDKs, Electron, Capacitor, database, or privileged server modules. Lint enforces this boundary; platform shells supply authentication adapters.
 - Platform shells provide asset locations and, when needed, small capability adapters for operations such as choosing a photo or recording audio.
 - Browser, desktop renderer, and mobile code may use `fridge-ui`, `contracts`, `domain`, and `api-client`.
 - They must never import `database`, privileged authentication code, filesystem storage, or server secrets.
@@ -257,11 +261,11 @@ Return clear authentication, forbidden, missing, validation, and upload errors. 
 
 ## 8. Fridge interaction and appearance
 
-### Scene
+### Illustration
 
-- A real 3D fridge model, initially built with simple geometry; slightly angled front view and restrained lighting.
-- Fixed front surface with no door animation, free camera rotation, room exploration, or physics simulation.
-- Notes, photo prints, and voice cards sit on that surface with small depth offsets and magnet details.
+- A flat painted fridge illustration over a matching kitchen background, viewed from the front with restrained illustrated depth.
+- Fixed front surface with no door animation, room exploration, or physics simulation.
+- Notes, photo prints, and voice cards sit on that surface with layered ordering and magnet details.
 - New posts receive the newest shared creation order. Stable id ordering resolves equal timestamps.
 - Selection raises a post only in the current client's render state. It never updates shared position or ordering.
 - On deselection, restore its normal creation-based layer. Greyed-out posts keep their place until expiry or Undo.
@@ -275,9 +279,9 @@ Return clear authentication, forbidden, missing, validation, and upload errors. 
 - Fit the fridge into the viewport while preserving its coordinate system. Keep touch targets large enough to select overlapping posts.
 - Keep page/modal scrolling usable; restrict gesture suppression to the interaction surface.
 - Support keyboard selection, modal focus management, Escape, and a basic keyboard movement alternative. These controls operate the same post model.
-- If 3D rendering cannot initialize, show a useful recovery state and a minimal accessible way to reach posts; the primary experience remains 3D.
+- The illustration is ordinary images with an inline SVG fallback and no renderer to initialize; posts remain usable wherever HTML renders.
 
-Visual review should use actual text/photo/voice examples on laptop and phone sizes before polishing materials. Do not delay readability and touch testing until the end.
+Visual review should use actual text/photo/voice examples on laptop and phone sizes before polishing the illustration. Do not delay readability and touch testing until the end.
 
 ## 9. The slow-removal mechanic
 
@@ -351,7 +355,7 @@ Exit: a fresh checkout can start the local website and PostgreSQL following the 
 - [x] Establish the coordinate conversion and selection-layer rules before persistence.
 - [ ] Complete physical-phone testing of dragging, scrolling, the virtual keyboard, and sample audio; review the visual direction with the user.
 
-Implementation notes and validation boundaries are recorded in [the fridge interaction decision](docs/decisions/0002-fridge-interaction.md). The prototype includes local one-hour removal/Undo/expiry; server-authoritative shared behavior remains Phase 5.
+Implementation notes and validation boundaries are recorded in [the fridge interaction decision](docs/decisions/0002-fridge-interaction.md). The prototype includes local one-hour removal/Undo/expiry; server-authoritative shared behavior remains Phase 5. The 3D renderer built in this phase was later replaced by the flat illustration (see [the flat-render decision](docs/decisions/0004-flat-fridge-render.md)); coordinates and interaction rules carry over.
 
 Verified: formatting, lint, TypeScript, 12 unit tests, production build, and 14 browser checks passed. Desktop and phone-sized layouts were also inspected visually. Browser verification used Chromium 149.0.7827.55 with software rendering; physical-device and Safari checks remain pending.
 
@@ -374,21 +378,27 @@ Exit: the existing Next.js site looks and behaves the same, but its page renders
 
 ### Phase 4 - Identity, homes, and invitations
 
-- [ ] Configure a real Firebase project, connect Google sign-in, and verify Firebase identity tokens on the server.
-- [ ] Introduce shared request/response contracts and `packages/api-client` around these first real HTTP operations; make the web frontend use that client.
-- [ ] Implement creating/listing homes, creator-only invitations and rename/removal controls, and ordinary member departure.
-- [ ] Create the initial fridge board with each new home in one transaction.
-- [ ] Support both existing-user invitations and invitations claimed on first matching sign-in.
-- [ ] Check membership in routes and services, including stale sessions after removal.
+- [ ] Verify Google sign-in and server token checks with real accounts. The Firebase project, web app, Google provider, authorized localhost domain, and local credentials are configured; the live account walkthrough remains.
+- [x] Introduce shared request/response contracts and `packages/api-client` around these first real HTTP operations; make the web frontend use that client.
+- [x] Implement creating/listing homes, creator-only invitations and rename/removal controls, and ordinary member departure.
+- [x] Create the initial fridge board with each new home in one transaction.
+- [x] Support both existing-user invitations and invitations claimed on first matching sign-in.
+- [x] Check membership in routes and services, including stale sessions after removal.
+
+The public fridge playground is the `/app` home page; `/` redirects there. Choosing Sign in opens Google authentication and then the home switcher at `/app/homes`. People who are already signed in can still visit the playground and open the switcher from its header. Inside a home, the fridge still uses sample posts that reset on refresh. Persisting actual shared posts begins in Phase 5. A local PostgreSQL integration test covers the home and membership flows; the real Firebase account walkthrough is the remaining Phase 4 gate.
 
 Exit: Alice creates a home, invites Bob, and Bob sees it without accepting. Carol cannot read it. Bob can leave; the creator cannot leave through either UI or API.
 
 ### Phase 5 - Persistent shared text notes
 
-- [ ] Connect the 3D scene to the HTTP API and local database.
-- [ ] Implement create/edit, shared movement, newest-on-top order, local selection, and last-save-wins saves.
-- [ ] Add polling with focus/reconnect handling and error states.
-- [ ] Implement one-hour pending removal, shared Undo, and server-authoritative expiry.
+- [x] Connect the fridge UI to the HTTP API and local database.
+- [x] Implement create/edit, shared movement, newest-on-top order, local selection, and last-save-wins saves.
+- [x] Add polling with focus/reconnect handling and error states.
+- [x] Implement one-hour pending removal, shared Undo, and server-authoritative expiry.
+
+Posts live in the existing `posts`/`boards` tables with membership-checked board/post endpoints, split content/position writes, and atomic conditional removal/Undo. The fridge polls every 5 seconds with focus/reconnect refetching; drags preview locally and commit on release; modal drafts survive polls; a `boards.post_additions` counter drives plant growth; `pnpm db:prune-expired` physically removes expired text rows. The playground is unchanged.
+
+Verified: formatting, lint, TypeScript, unit tests (contracts, api-client, fridge-ui, domain), production build, and DB integration suites (posts, homes, maintenance) against local PostgreSQL passed. All 74 browser checks passed on desktop and emulated touch, including 7 new shared-posts specs with mocked API (round-trips, polling, draft safety, conflicts, access loss, home switching) and the unmodified playground suite. Browser verification used the cached chromium-1228 executable via `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. The live two-account walkthrough with real Firebase accounts remains pending.
 
 Exit: two browser sessions see each other's saved notes and moves through polling. Reload preserves positions. Concurrent saves follow the chosen rule. Expiry and Undo work without a worker.
 
@@ -471,7 +481,7 @@ Exit: an installable desktop app uses the same homes and posts, with no local da
 - [ ] Create a Capacitor application that imports `fridge-ui`, `api-client`, `contracts`, and `domain` instead of copying frontend code.
 - [ ] Configure the web bundle, iOS/Android projects, authentication callbacks, permissions, media picker, and recording plugins.
 - [ ] Connect native operations through small capability adapters while keeping ordinary React UI and browser-standard behavior inside `fridge-ui`.
-- [ ] Test the shared Three.js scene, touch behavior, modal layout, camera/microphone flows, and performance in real iOS and Android WebViews.
+- [ ] Test the shared fridge UI, touch behavior, modal layout, camera/microphone flows, and performance in real iOS and Android WebViews.
 
 Exit: a device-tested mobile app uses the same backend and product rules. Offline synchronization and push notifications remain separate later features.
 
@@ -569,7 +579,6 @@ Initially checked during planning on 2026-09-16; the Capacitor/Electron frontend
 - [Neon connection pooling](https://neon.com/blog/pgbouncer-the-one-with-prepared-statements) - pooled connections for application workloads.
 - [Firebase Google sign-in](https://firebase.google.com/docs/auth/web/google-signin) - real Google identity in local and deployed environments.
 - [Firebase ID token verification](https://firebase.google.com/docs/auth/admin/verify-id-tokens) - server-side identity verification.
-- [React Three Fiber introduction](https://r3f.docs.pmnd.rs/) - React integration and version compatibility considerations.
 - [Capacitor documentation](https://capacitorjs.com/docs) - adding a native runtime and plugin APIs to an existing modern web application.
 - [Electron process model](https://www.electronjs.org/docs/latest/tutorial/process-model) - web-based renderers plus isolated main/preload responsibilities.
 - [W3C Geolocation specification](https://www.w3.org/TR/geolocation/) - per-reading location accuracy and device-location behavior.
