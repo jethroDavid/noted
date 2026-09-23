@@ -1,4 +1,0 @@
-{
-  "extends": "@noted/typescript-config/library.json",
-  "include": ["src/**/*.ts"]
-}

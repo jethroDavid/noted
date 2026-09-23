@@ -1,1 +1,0 @@
-ALTER TABLE "boards" ADD COLUMN "post_additions" integer DEFAULT 0 NOT NULL;

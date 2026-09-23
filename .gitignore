@@ -1,22 +1,28 @@
+# Dependencies
 node_modules/
 .pnpm-store/
+
+# Build outputs
 .next/
 dist/
 coverage/
-test-results/
-playwright-report/
 *.tsbuildinfo
+.turbo/
+.cache/
 
+# Env and secrets (never commit; Phase 0 adds .env.example)
 .env
 .env.*
 !.env.example
 
-.local/*
-!.local/.gitkeep
+# Local-only state (Firebase creds, scratch)
+.local/
 
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
+# Test and review artifacts
+test-results/
+playwright-report/
 .screenshots/
+
+# OS and editor
+.DS_Store
+*.pem
