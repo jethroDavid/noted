@@ -68,6 +68,22 @@ Operational checklist (proposed by interviewer, carried unopposed):
 
 Acceptance: owner reply 2026-09-23 (chat): "i think we can start the skill, planning and deleting" — taken as scope acceptance plus go-ahead for the skill, planning, and wipe stages.
 
+## Amendment 2026-09-24 — skill-demo reframing (interview in progress)
+
+Owner reframed the effort (chat 2026-09-24): the framework stays, but this is a demo of skill, not a product. Narrow app: kitchen background, fridge board, a TV with short videos like reels, a simple photo book — "that is it". Photo book holds images removed from the fridge.
+
+Q1 (demo scope) answer (chat 2026-09-24): "no this is shared, that is the point of the demo, we are going to use websocket, pub/sub, redis / cache, queues, workers, the challenge is to use all this tech, host it in vercel, the postgres is a service, probably s3".
+
+Settled: the demo is SHARED (multi-user) and its point is demonstrating the tech (realtime plus cache plus queues plus workers). Foundation decisions D3–D5 stand unchanged. Hosting fixed: Vercel (was TBD). Postgres fixed: managed service (Neon stays the default). Object storage: probably S3 (S3-compatible API assumed).
+
+Standing demo-scope defaults (vetoable): fixed kitchen scene with the theme system deferred to a product backlog; text plus photo fridge with no voice; uploads go to S3-compatible storage via presigned URLs; workers handle media processing (thumbnails, poster frames) as the queue's initial job list.
+
+Q2 settled (chat 2026-09-24): owner picked option 1 — Vercel-native WebSockets (public beta via `experimental_upgradeWebSocket()` on Fluid Compute) with Redis pub/sub fan-out for cross-instance delivery. Accepted caveats: connections die at function max duration (client reconnects), beta status, Fluid billing. Research behind the options: multiple 2026 sources confirm the beta and Vercel's Redis-fan-out guidance; official docs inspected at plan time (see revised PLAN.md sources).
+
+Q3 resolved by default (veto at plan approval, no question asked): queue provider is Upstash QStash (same vendor as Redis, Vercel marketplace, HTTP delivery to API-route workers, zero new infra); initial job list is media processing (photo thumbnails, reels poster frames, variant cleanup on removal). Rationale: the demo needs the queue/worker categories, not a specific logo; vendor consolidation keeps the realtime backbone, cache, and queue on one integration.
+
+Amendment interview closed 2026-09-24: no unresolved items; revised PLAN.md carries the details for approval.
+
 ## Unresolved questions
 
 - Scope-contract acceptance (this record becoming Final) — the only remaining item.

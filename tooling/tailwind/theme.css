@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Shared design tokens. Apps import this theme, then add their own layers. */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

@@ -1,64 +1,63 @@
-# Noted — Product and Build Plan
+# Noted — Skill-Demo Build Plan
 
-Status: Accepted 2026-09-23 — the rebuild roadmap. Governed by `docs/decisions/0005-rebuild-on-clean-foundation.md` and the project `architect` skill. The v1 tree (prior plan, code, and learnings) is preserved behind the `archive/noted-v1` tag. Phase 0 (scaffold) starts on explicit go-ahead.
+Status: Accepted 2026-09-24 — the rebuild roadmap. This is a demo of skill, not a product: a narrow shared app whose point is demonstrating the tech (realtime, cache, queues, workers) on a clean turbo-shaped foundation. Governed by `docs/decisions/0005-rebuild-on-clean-foundation.md` (plus 2026-09-24 amendment) and the project `architect` skill. v1 is preserved behind the `archive/noted-v1` tag.
 
 ## Progress
 
-- [ ] Phase 0 — Foundation scaffold
-- [ ] Phase 1 — Noting core on the default theme
-- [ ] Phase 2 — Per-home themes
-- [ ] Phase 3 — Media (photo and voice)
-- [ ] Phase 4 — AI themes
-- [ ] Phase 5 — Hardening and deploy
+- [ ] Phase 0 — Foundation scaffold (in progress)
+- [ ] Phase 1 — Shared noting core
+- [ ] Phase 2 — Realtime backbone
+- [ ] Phase 3 — TV reels, photo book, media pipeline
+- [ ] Phase 4 — Hardening and Vercel deploy
 
-## 1. Product vision
+## 1. The demo
 
-Noted is a shared family board for everyday notes. One home, one board: text, photo, and voice posts that members drag, open, edit, and grey out for one-hour shared Undo. Every home picks its own visual theme — a bundled scene, uploaded art, or AI-generated art constrained by a validated manifest — while the noting interaction stays identical everywhere. Web first; native shells later.
+One shared family kitchen, fixed scene: kitchen background, fridge board with text and photo notes (drag, modal edit; text notes use one-hour grey removal with shared Undo, removed photos archive straight to the book), a TV with a vertical short-video feed (reels-style playback), and a photo book that auto-archives images removed from the fridge. Multi-user shared homes with Google auth. No themes, no voice, no native shells in the demo.
 
-## 2. Foundation (settled, see ADR 0005)
+## 2. Architecture (settled)
 
-- Shape references `create-t3-turbo`: pnpm + Turbo v2 pipeline, `apps/*` thin shells, `packages/*` single-responsibility (`api`, `db`, `validators`, `ui`, shared configs), CI mirroring the local gate.
-- tRPC + zod + superjson is the only API definition; media uploads ride a small REST side-path.
-- Tailwind for UI plus a small bespoke board-art layer; Drizzle for persistence; local Postgres for dev, Neon for deployment.
-- Firebase Google auth behind a small server seam; shells own sign-in UI only.
+- Turbo shape: pnpm plus Turbo v2 pipeline, `apps/*` thin shells, `packages/*` single-responsibility, `tooling/*` shared configs, CI mirroring the local gate.
+- API: tRPC plus zod plus superjson is the only API definition; media uploads use a presigned-URL REST side-path to S3-compatible storage.
+- Realtime: Vercel-native WebSockets (public beta, Fluid) via the documented Next.js upgrade API; Redis pub/sub (Upstash via Vercel Marketplace) for cross-instance fan-out, rooms, and presence; client reconnect with resubscribe plus state reload. Mutations travel over tRPC, events publish to Redis, rooms broadcast to subscribers.
+- Cache: Redis caches board reads; mutation events invalidate. Local Redis via compose for development.
+- Queue and workers: Upstash QStash with publishers plus zod job schemas in `packages/queue` and HTTP API-route workers. Jobs: photo thumbnails, reels poster frames, variant cleanup on removal.
+- Data: Drizzle; local Postgres for development, managed Postgres service in production (Neon is the standing default). Firebase Google auth behind a small server seam.
+- Web: Next.js plus Tailwind plus a small board-art layer, hosted on Vercel.
 - The `architect` skill gates every structural change. Headline rule: the repo follows a clear pattern — the v1 hand-written `api-client` shape must never return.
-- Done criteria for the foundation: one-command setup works; one gate (types, lint, tests, build) green locally and in CI; tRPC end-to-end types with no duplicated client; boundaries documented and lint-enforced.
 
 ## 3. Learnings carried from v1
 
-Keep: normalized 0..1 post coordinates; last-save-wins with per-operation membership checks; one-hour grey removal with shared Undo; server-anchored clock; preview-then-commit drags (no optimistic writes for shared data); generation-stamped operations; flat SVG fallback when art fails; themes as art plus validated manifest with fixed board/CSS slots; theme changes creator-only; posts keep colors across switches; uploads before AI generation; live two-account and physical-phone reviews gate every trust claim.
+Keep: normalized 0..1 coordinates; last-save-wins with per-operation membership checks; one-hour grey removal with shared Undo for text, instant book archive for removed photos; server-anchored clock; preview-then-commit drags; generation-stamped operations; flat SVG fallback when art fails; live two-account and physical-phone reviews gating every trust claim.
+
+Changed: polling is replaced by WebSocket plus Redis realtime (polling survives only as Phase 1's temporary transport); themes, AI generation, and voice move to the product backlog.
 
 Banned: hand-written API clients; a single giant stylesheet; API contracts defined in more than one place; growth-decor complexity; per-theme geometry; bespoke framework-lets of any kind.
 
 ## 4. Phases
 
-### Phase 0 — Foundation scaffold
+### Phase 0 — Foundation scaffold (in progress)
 
 Turbo tree, shared configs, pipeline plus CI mirror, Drizzle with local Postgres and migrations, dotenv env with typed validation, Firebase seam skeleton, Tailwind plus board-art skeleton, one-command setup documented. Exit: the foundation done criteria pass on an empty app, including a typed tRPC hello round-trip.
 
-### Phase 1 — Noting core on the default theme
+### Phase 1 — Shared noting core
 
-tRPC routers for homes, members, and posts with membership checks; board UI with text notes, drag, modal editing, slow removal with shared Undo, and polling; default theme art; seed and fixtures. Exit: playground plus shared-home text noting works end to end; two-browser check passes; gate green.
+Auth plus homes, members, and fridge text and photo notes with text slow-removal plus Undo and instant photo archive to the book store (book UI lands in Phase 3); temporary refetch transport; seed plus fixtures including bundled fridge photos and sample reels. Exit: two-browser shared noting works end to end; gate green.
 
-### Phase 2 — Per-home themes
+### Phase 2 — Realtime backbone
 
-Manifest schema in `validators`; themes table with private member-only art; default plus bedroom bundled themes proving the slot contract; creator select and apply; theme rides the board query. Exit: per-home switching works, posts keep positions and colors, members see changes on poll.
+WebSocket route plus Fluid config plus Redis pub/sub rooms and fan-out plus client reconnect; board-read cache with event invalidation; compose gains local Redis; Upstash env wired. Polling removed. Exit: live two-browser updates; reconnect drill (kill plus resume) passes; cache hits verified.
 
-### Phase 3 — Media (photo and voice)
+### Phase 3 — TV reels, photo book, media pipeline
 
-REST side-path uploads, private storage with lifecycle and pruning, playback UI. Exit: upload, attach, and prune verified; non-member access rejected.
+S3 presigned uploads; QStash publishers plus workers for thumbnails, poster frames, and cleanup; reels feed UI; book archive UI; remove-to-book flow. Exit: upload to process to playback works end to end; removal archives to the book; non-member access rejected.
 
-### Phase 4 — AI themes
+### Phase 4 — Hardening and Vercel deploy
 
-OpenAI port plus adapter with stub default; prompt-to-theme generation; vision-proposed manifests for uploads; preview-then-apply. Exit: bundled and upload paths work with no key; live-key generation verified by human eye (transparent surface, empty usable area).
+Neon plus Upstash plus S3 production wiring; rate and cost guards; Fluid and beta limits documented and verified; live two-account and physical-phone reviews. Exit: public demo URL; reviews pass; gates green.
 
-### Phase 5 — Hardening and deploy
+### Later — product backlog (explicit non-goals)
 
-Hosting decision, Neon production database, rate and cost guards, content-moderation answer, live two-account and physical-phone reviews. Exit: deployed, reviews pass, foundation checklist holds on the new tree.
-
-### Later (explicit non-goals)
-
-Electron and Capacitor shells, map, activities, multi-board scenes.
+Theme system plus AI generation, voice notes, Electron and Capacitor shells, map, activities, multi-board scenes.
 
 ## 5. Working agreements
 
@@ -77,6 +76,7 @@ Electron and Capacitor shells, map, activities, multi-board scenes.
 - `https://raw.githubusercontent.com/t3-oss/create-t3-turbo/main/packages/validators/package.json`
 - `https://raw.githubusercontent.com/t3-oss/create-t3-turbo/main/apps/nextjs/package.json`
 - `https://raw.githubusercontent.com/t3-oss/create-t3-turbo/main/.github/workflows/ci.yml`
-- `https://developers.openai.com/api/docs/guides/image-generation`
-- `https://developers.openai.com/api/docs/guides/structured-outputs`
+- `https://vercel.com/docs/functions/websockets`
+- `https://upstash.com/docs/redis`
+- `https://upstash.com/docs/qstash`
 - v1 tree and prior plans: `archive/noted-v1` tag (`PLAN.md`, `.agents/plans/2026-09-23-board-themes.md`)
