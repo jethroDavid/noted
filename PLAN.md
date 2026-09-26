@@ -4,7 +4,7 @@ Status: Accepted 2026-09-24 — the rebuild roadmap. This is a demo of skill, no
 
 ## Progress
 
-- [ ] Phase 0 — Foundation scaffold (in progress)
+- [x] Phase 0 — Foundation scaffold
 - [ ] Phase 1 — Shared noting core
 - [ ] Phase 2 — Realtime backbone
 - [ ] Phase 3 — TV reels, photo book, media pipeline

@@ -1,6 +1,6 @@
 import nextPlugin from "@next/eslint-plugin-next";
+import reactConfig from "@noted/eslint-config/react";
 import tseslint from "typescript-eslint";
-import reactConfig from "./react.js";
 
 export default tseslint.config(...reactConfig, {
   plugins: { "@next/next": nextPlugin },

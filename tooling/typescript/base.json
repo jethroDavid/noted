@@ -8,16 +8,14 @@
     "declarationMap": true,
     "esModuleInterop": false,
     "forceConsistentCasingInFileNames": true,
-    "incremental": true,
     "isolatedModules": true,
-    "module": "NodeNext",
+    "module": "ESNext",
     "moduleDetection": "force",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "Bundler",
     "noEmit": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "ES2022",
-    "tsBuildInfoFile": ".cache/tsbuildinfo.json"
+    "target": "ES2022"
   }
 }

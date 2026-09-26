@@ -22,7 +22,7 @@ You are the architecture gate for this repo. Load this skill before creating pac
 4. Drizzle owns persistence: schema plus migrations in `db`, one client, no raw SQL outside migrations and seed.
 5. Styling: Tailwind utilities for UI; bespoke CSS only for the board art layer.
 6. Theme system rules: fixed board and CSS slots; a theme is art plus a validated manifest JSON; theme changes are creator-only; posts keep their colors across theme switches.
-7. Dependency direction: apps depend on `api`, which depends on `db` and `validators`; `ui` and `validators` depend on nothing internal. Lint must enforce it; flag any new edge that breaks the direction.
+7. Dependency direction: apps depend on `api`, which depends on `auth`, `db`, and `validators`; `auth`, `db`, `ui`, and `validators` depend on nothing internal. Lint must enforce it; flag any new edge that breaks the direction.
 
 ## On every structural change
 

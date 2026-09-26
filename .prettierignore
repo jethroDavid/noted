@@ -1,0 +1,18 @@
+# Union ignore file for the root prettier run (prettier reads only one ignore
+# file, so this mirrors the relevant .gitignore entries plus prettier-only ones).
+node_modules/
+.pnpm-store/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+.turbo/
+.cache/
+.env
+.env.*
+test-results/
+playwright-report/
+.screenshots/
+
+# Generated files prettier must not touch
+pnpm-lock.yaml

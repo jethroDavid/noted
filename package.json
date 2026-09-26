@@ -1,0 +1,41 @@
+{
+  "name": "noted",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=22.21.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "turbo watch dev --continue",
+    "dev:web": "turbo watch dev --filter=@noted/web...",
+    "setup": "docker compose up -d --wait && pnpm db:migrate",
+    "dev:all": "pnpm setup && pnpm dev:web",
+    "db:generate": "turbo run --filter=@noted/db generate",
+    "db:migrate": "turbo run --filter=@noted/db migrate",
+    "db:studio": "turbo run --filter=@noted/db studio",
+    "build": "turbo run build",
+    "test": "vitest run",
+    "typecheck": "turbo run typecheck && tsc --noEmit",
+    "lint": "turbo run lint --continue && eslint vitest.config.ts",
+    "lint:fix": "turbo run lint --continue -- --fix && eslint vitest.config.ts --fix",
+    "format": "turbo run format --continue && prettier --check .",
+    "format:fix": "turbo run format --continue -- --write && prettier --write .",
+    "check": "pnpm format && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "clean": "git clean -xdf node_modules"
+  },
+  "devDependencies": {
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "dotenv-cli": "^11.0.0",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "turbo": "^2.5.8",
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
+  },
+  "prettier": "@noted/prettier-config"
+}

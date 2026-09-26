@@ -1,0 +1,4 @@
+{
+  "extends": "@noted/tsconfig/base.json",
+  "include": ["vitest.config.ts"]
+}

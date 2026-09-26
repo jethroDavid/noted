@@ -1,5 +1,5 @@
-import js from "@eslint/js";
 import { fixupPluginRules } from "@eslint/compat";
+import js from "@eslint/js";
 import importPlugin from "eslint-plugin-import";
 import turboPlugin from "eslint-plugin-turbo";
 import tseslint from "typescript-eslint";

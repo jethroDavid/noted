@@ -26,6 +26,7 @@
   "devDependencies": {
     "@noted/prettier-config": "workspace:*",
     "@noted/tsconfig": "workspace:*",
+    "@types/eslint-plugin-jsx-a11y": "^6.10.1",
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "prettier": "catalog:",
