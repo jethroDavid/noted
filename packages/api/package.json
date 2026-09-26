@@ -13,8 +13,10 @@
   "dependencies": {
     "@noted/auth": "workspace:*",
     "@noted/db": "workspace:*",
+    "@noted/domain": "workspace:*",
     "@noted/validators": "workspace:*",
     "@trpc/server": "catalog:",
+    "drizzle-orm": "catalog:",
     "superjson": "^2.2.6",
     "zod": "catalog:"
   },
@@ -23,7 +25,8 @@
     "@noted/prettier-config": "workspace:*",
     "@noted/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
   },
   "prettier": "@noted/prettier-config"
 }

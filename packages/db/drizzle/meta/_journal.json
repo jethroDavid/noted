@@ -1,13 +1,13 @@
 {
-  "version": "7",
   "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
       "version": "7",
-      "when": 1790256352915,
-      "tag": "0000_parallel_madame_hydra",
+      "when": 1790388160684,
+      "tag": "0000_chief_ironclad",
       "breakpoints": true
     }
-  ]
+  ],
+  "version": "7"
 }

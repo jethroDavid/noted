@@ -6,6 +6,10 @@ import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { useState } from "react";
 import superjson from "superjson";
+import {
+  isFirebaseConfigured,
+  webAuth,
+} from "../platform/auth/firebase-client";
 
 const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
@@ -24,6 +28,13 @@ export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
         httpBatchLink({
           transformer: superjson,
           url: `${getBaseUrl()}/api/trpc`,
+          // Firebase caches the token until near expiry, so per-request
+          // resolution stays cheap while surviving token refreshes.
+          headers: async () => {
+            if (!isFirebaseConfigured()) return {};
+            const token = await webAuth().currentUser?.getIdToken();
+            return token ? { authorization: `Bearer ${token}` } : {};
+          },
         }),
       ],
     }),

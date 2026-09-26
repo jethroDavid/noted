@@ -11,9 +11,13 @@ catalog:
   "@trpc/server": ^11.7.1
   "@trpc/tanstack-react-query": ^11.7.1
   "@types/node": ^22.18.12
+  dotenv: ^16.6.1
+  drizzle-orm: ^0.45.3
   eslint: ^9.38.0
+  firebase: ^12.19.0
   prettier: ^3.6.2
   tailwindcss: ^4.1.16
+  tsx: ^4.23.15
   typescript: ^5.9.3
   zod: ^4.1.12
 

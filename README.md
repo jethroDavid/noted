@@ -11,7 +11,7 @@ Prereqs: Node 24, pnpm 10, Docker.
 ```sh
 pnpm install
 cp .env.example .env   # fill in real values; never commit .env
-pnpm setup             # starts Postgres, runs migrations
+pnpm run setup        # starts Postgres, runs migrations (`run` avoids pnpm's builtin)
 pnpm dev:web           # Next.js app with the tRPC hello round-trip
 ```
 
@@ -30,18 +30,20 @@ CI mirrors the same five tasks. Nothing merges red.
 - `apps/web` — Next.js shell: routes, providers, auth UI, board scene.
 - `packages/api` — tRPC routers, the only API definition.
 - `packages/db` — Drizzle schema, client, migrations.
+- `packages/domain` — shared domain rules (removal window, coordinates).
 - `packages/auth` — Firebase server seam (verify ID tokens) and env.
 - `packages/validators` — pure zod schemas shared by API and app.
 - `packages/ui` — shared visual components.
 - `tooling/*` — shared tsconfig, eslint, prettier, tailwind configs plus the CI setup action.
 
-Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` → `auth`/`db`/`validators`, enforced by lint.
+Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` → `auth`/`db`/`domain`/`validators`, enforced by lint.
 
 ## Database workflow
 
 ```sh
 pnpm db:generate   # after editing packages/db/src/schema.ts
 pnpm db:migrate    # applies pending migrations to local Postgres
+pnpm db:seed -- --email you@example.com --subject <firebase-uid>
 ```
 
 Run `pnpm format:fix` after generating — Drizzle writes its meta files in its own style.

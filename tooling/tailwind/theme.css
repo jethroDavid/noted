@@ -4,3 +4,8 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Automatic content detection only scans each app directory, so register
+   the shared visuals package explicitly — otherwise classes used solely
+   by @noted/ui (stage aspect, modal chrome) are never generated. */
+@source "../../packages/ui/src";

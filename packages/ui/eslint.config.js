@@ -16,6 +16,8 @@ export default [
                 "@noted/auth/**",
                 "@noted/db",
                 "@noted/db/**",
+                "@noted/domain",
+                "@noted/domain/**",
                 "@noted/ui",
                 "@noted/ui/**",
                 "@noted/validators",

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthProvider } from "../platform/auth/auth-provider";
 import { TRPCReactProvider } from "../trpc/react";
 import "../styles/globals.css";
 
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+        <TRPCReactProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </TRPCReactProvider>
       </body>
     </html>
   );
