@@ -2,23 +2,26 @@ import {
   boardIdSchema,
   boardPostSchema,
   boardPostsResponseSchema,
+  boardPresenceEventSchema,
   createPhotoPostSchema,
   createTextPostSchema,
   homeIdSchema,
   postIdSchema,
+  restoreAnyPostSchema,
   updatePostContentSchema,
   updatePostPositionSchema,
 } from "@noted/validators/src";
 import { z } from "zod";
 import {
-  archivePhoto,
+  refreshPresence,
   createPhotoPost,
   createTextPost,
   editPostContent,
   movePost,
   readBoard,
-  requestRemoval,
-  undoRemoval,
+  removePost,
+  restoreAnyPost,
+  watchBoard,
 } from "../services/posts";
 import { protectedProcedure, router } from "../trpc";
 
@@ -78,24 +81,34 @@ export const boardsRouter = router({
       }),
     ),
 
-  requestRemoval: protectedProcedure
-    .input(postInput)
-    .output(boardPostSchema)
-    .mutation(async ({ ctx, input }) =>
-      requestRemoval(ctx.user, input.homeId, input.postId),
-    ),
-
-  undoRemoval: protectedProcedure
-    .input(postInput)
-    .output(boardPostSchema)
-    .mutation(async ({ ctx, input }) =>
-      undoRemoval(ctx.user, input.homeId, input.postId),
-    ),
-
-  archivePhoto: protectedProcedure
+  removePost: protectedProcedure
     .input(postInput)
     .output(z.object({ postId: postIdSchema }))
     .mutation(async ({ ctx, input }) =>
-      archivePhoto(ctx.user, input.homeId, input.postId),
+      removePost(ctx.user, input.homeId, input.postId),
+    ),
+
+  restorePost: protectedProcedure
+    .input(boardInput.and(restoreAnyPostSchema))
+    .output(boardPostSchema)
+    .mutation(async ({ ctx, input }) =>
+      restoreAnyPost(ctx.user, input.homeId, input.boardId, input),
+    ),
+
+  // No .output(): tRPC types it as the resolver's return, which breaks
+  // generator inference. watchBoard validates every yielded event instead,
+  // and the BoardEvent type still flows to the client.
+  onEvent: protectedProcedure.input(boardInput).subscription(async function* ({
+    ctx,
+    input,
+  }) {
+    yield* watchBoard(ctx.user, input.homeId, input.boardId);
+  }),
+
+  refreshPresence: protectedProcedure
+    .input(boardInput)
+    .output(boardPresenceEventSchema)
+    .mutation(async ({ ctx, input }) =>
+      refreshPresence(ctx.user, input.homeId, input.boardId),
     ),
 });

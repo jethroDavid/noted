@@ -1,25 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   clampNormalizedCoordinate,
-  getRemovalDeadline,
   PHOTO_FIXTURES,
   photoFixtureImageUrl,
   photoFixtureStorageKey,
-  REMOVAL_RECOVERY_MS,
 } from "./index";
-
-describe("removal window", () => {
-  it("spans one hour", () => {
-    expect(REMOVAL_RECOVERY_MS).toBe(3_600_000);
-  });
-
-  it("anchors the deadline to the request time", () => {
-    const requestedAt = new Date("2026-09-26T10:00:00.000Z");
-    expect(getRemovalDeadline(requestedAt)).toEqual(
-      new Date("2026-09-26T11:00:00.000Z"),
-    );
-  });
-});
 
 describe("clampNormalizedCoordinate", () => {
   it("clamps outside values into 0..1", () => {

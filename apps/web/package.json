@@ -15,6 +15,7 @@
     "@noted/auth": "workspace:*",
     "@noted/db": "workspace:*",
     "@noted/domain": "workspace:*",
+    "@noted/realtime": "workspace:*",
     "@noted/tailwind-config": "workspace:*",
     "@noted/ui": "workspace:*",
     "@noted/validators": "workspace:*",

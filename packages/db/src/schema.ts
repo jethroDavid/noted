@@ -202,14 +202,9 @@ export const posts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    deletionRequestedAt: timestamp("deletion_requested_at", {
-      withTimezone: true,
-    }),
-    deleteAfter: timestamp("delete_after", { withTimezone: true }),
   },
   (table) => [
     index("posts_board_created_idx").on(table.boardId, table.createdAt),
-    index("posts_delete_after_idx").on(table.deleteAfter),
     check(
       "posts_normalized_position",
       sql`${table.positionX} between 0 and 1 and ${table.positionY} between 0 and 1`,
@@ -217,10 +212,6 @@ export const posts = pgTable(
     check(
       "posts_content_matches_kind",
       sql`(${table.kind} = 'text' and ${table.textContent} is not null and ${table.mediaAssetId} is null) or (${table.kind} = 'photo' and ${table.textContent} is null and ${table.mediaAssetId} is not null)`,
-    ),
-    check(
-      "posts_deletion_pair",
-      sql`(${table.deletionRequestedAt} is null and ${table.deleteAfter} is null) or (${table.deletionRequestedAt} is not null and ${table.deleteAfter} is not null and ${table.deleteAfter} > ${table.deletionRequestedAt})`,
     ),
   ],
 );

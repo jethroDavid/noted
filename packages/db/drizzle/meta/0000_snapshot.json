@@ -1,5 +1,5 @@
 {
-  "id": "32cce220-1636-4dbf-82db-b70fb4cabbb2",
+  "id": "2aaa52c4-40e8-4e3f-9023-73fed6d317b6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -630,18 +630,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "deletion_requested_at": {
-          "name": "deletion_requested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "delete_after": {
-          "name": "delete_after",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -656,21 +644,6 @@
             },
             {
               "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "posts_delete_after_idx": {
-          "name": "posts_delete_after_idx",
-          "columns": [
-            {
-              "expression": "delete_after",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -722,10 +695,6 @@
         "posts_content_matches_kind": {
           "name": "posts_content_matches_kind",
           "value": "(\"posts\".\"kind\" = 'text' and \"posts\".\"text_content\" is not null and \"posts\".\"media_asset_id\" is null) or (\"posts\".\"kind\" = 'photo' and \"posts\".\"text_content\" is null and \"posts\".\"media_asset_id\" is not null)"
-        },
-        "posts_deletion_pair": {
-          "name": "posts_deletion_pair",
-          "value": "(\"posts\".\"deletion_requested_at\" is null and \"posts\".\"delete_after\" is null) or (\"posts\".\"deletion_requested_at\" is not null and \"posts\".\"delete_after\" is not null and \"posts\".\"delete_after\" > \"posts\".\"deletion_requested_at\")"
         }
       },
       "isRLSEnabled": false

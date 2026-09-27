@@ -7,24 +7,40 @@ import {
   mediaAssets,
   posts,
 } from "@noted/db/src";
+import { PHOTO_FIXTURES, photoFixtureStorageKey } from "@noted/domain/src";
 import {
-  PHOTO_FIXTURES,
-  photoFixtureStorageKey,
-  REMOVAL_RECOVERY_MS,
-} from "@noted/domain/src";
+  refreshBoardPresence,
+  invalidateBoardCache,
+  isBoardViewerLive,
+  leaveBoardPresence,
+  listBoardViewers,
+  publishBoardEvent,
+  readBoardCache,
+  subscribeToBoard,
+  writeBoardCache,
+} from "@noted/realtime/src";
 import type {
+  BoardEvent,
   BoardPost,
   BoardPostsResponse,
+  BoardPresenceEvent,
+  BoardViewer,
   CreatePhotoPostInput,
   CreateTextPostInput,
+  RestoreAnyPostInput,
+  RestorePhotoPostInput,
+  RestorePostInput,
   UpdatePostContentInput,
   UpdatePostPositionInput,
 } from "@noted/validators/src";
+import {
+  boardEventSchema,
+  boardPostsResponseSchema,
+  boardViewerSchema,
+} from "@noted/validators/src";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { CurrentUser } from "./identity";
-
-const REMOVAL_RECOVERY_SECONDS = REMOVAL_RECOVERY_MS / 1000;
 
 const postColumns = {
   id: posts.id,
@@ -38,8 +54,6 @@ const postColumns = {
   positionY: posts.positionY,
   createdAt: posts.createdAt,
   updatedAt: posts.updatedAt,
-  deletionRequestedAt: posts.deletionRequestedAt,
-  deleteAfter: posts.deleteAfter,
 };
 
 interface PostRow {
@@ -54,12 +68,16 @@ interface PostRow {
   positionY: number;
   createdAt: Date;
   updatedAt: Date;
-  deletionRequestedAt: Date | null;
-  deleteAfter: Date | null;
   storageKey: string | null;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// A switch over every post kind ends with this, so a new kind fails the
+// build until each switch handles it.
+function assertNever(value: never): never {
+  throw new Error(`Unhandled post kind: ${String(value)}`);
+}
 
 function toBoardPost(row: PostRow): BoardPost {
   if (row.kind === "photo") {
@@ -97,23 +115,7 @@ function toBoardPost(row: PostRow): BoardPost {
     y: row.positionY,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    deletionRequestedAt: row.deletionRequestedAt,
-    deleteAfter: row.deleteAfter,
   };
-}
-
-function isExpired(row: Pick<PostRow, "deleteAfter">, now: Date) {
-  return row.deleteAfter !== null && row.deleteAfter.getTime() <= now.getTime();
-}
-
-/** Visible means never removed, or still inside the one-hour Undo window. Database time decides. */
-function visiblePosts() {
-  return or(isNull(posts.deleteAfter), gt(posts.deleteAfter, sql`now()`));
-}
-
-/** Editable means no removal was ever requested. Pending posts reject edits and moves. */
-function editablePosts() {
-  return isNull(posts.deletionRequestedAt);
 }
 
 function withMedia<T extends Record<string, unknown>>(columns: T) {
@@ -180,19 +182,6 @@ async function findPostForMember(
   return row;
 }
 
-async function findPostInBoard(
-  postId: string,
-  boardId: string,
-): Promise<PostRow | undefined> {
-  const [row] = await db
-    .select(withMedia(postColumns))
-    .from(posts)
-    .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
-    .where(and(eq(posts.id, postId), eq(posts.boardId, boardId)))
-    .limit(1);
-  return row;
-}
-
 async function requirePost(
   user: CurrentUser,
   homeId: string,
@@ -205,43 +194,27 @@ async function requirePost(
   return row;
 }
 
-async function missedUpdate(
-  postId: string,
-  boardId: string,
-  action: "edit" | "move",
-): Promise<never> {
-  const row = await findPostInBoard(postId, boardId);
-  if (!row) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
-  }
-  if (isExpired(row, new Date())) {
-    throw new TRPCError({
-      code: "CONFLICT",
-      message: "This post has already been removed.",
-    });
-  }
-  const verb = action === "edit" ? "edit it" : "move it";
-  throw new TRPCError({
-    code: "CONFLICT",
-    message: `This post is greyed out for removal. Undo removal to ${verb}.`,
-  });
-}
-
 export async function readBoard(
   user: CurrentUser,
   homeId: string,
   boardId: string,
 ): Promise<BoardPostsResponse> {
   const board = await requireBoard(user, homeId, boardId);
+  // Cache-aside: validated on the way out, since only validated reads are
+  // ever written back. A Redis outage reads through to Postgres.
+  const cached = await readBoardCache(board.id);
+  if (cached) {
+    const parsed = boardPostsResponseSchema.safeParse(cached);
+    if (parsed.success) return parsed.data;
+    console.error("Dropping board cache entry that fails validation.");
+  }
   const rows = await db
     .select(withMedia(postColumns))
     .from(posts)
     .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
-    .where(and(eq(posts.boardId, board.id), visiblePosts()))
+    .where(eq(posts.boardId, board.id))
     .orderBy(asc(posts.createdAt), asc(posts.id));
-  // App-server time anchors the client's display countdown. Removal
-  // eligibility itself is decided by database time in SQL.
-  return {
+  const response: BoardPostsResponse = {
     board: {
       id: board.id,
       homeId: board.homeId,
@@ -250,6 +223,8 @@ export async function readBoard(
     posts: rows.map(toBoardPost),
     serverTime: new Date(),
   };
+  await writeBoardCache(board.id, response);
+  return response;
 }
 
 async function bumpPostAdditions(transaction: Transaction, boardId: string) {
@@ -266,7 +241,7 @@ export async function createTextPost(
   input: CreateTextPostInput,
 ): Promise<BoardPost> {
   const board = await requireBoard(user, homeId, boardId);
-  return db.transaction(async (transaction) => {
+  const created = await db.transaction(async (transaction) => {
     const [post] = await transaction
       .insert(posts)
       .values({
@@ -285,6 +260,8 @@ export async function createTextPost(
     await bumpPostAdditions(transaction, board.id);
     return toBoardPost({ ...post, storageKey: null });
   });
+  await boardChanged(board.id);
+  return created;
 }
 
 export async function createPhotoPost(
@@ -304,7 +281,7 @@ export async function createPhotoPost(
     });
   }
   const storageKey = photoFixtureStorageKey(fixture.key);
-  return db.transaction(async (transaction) => {
+  const created = await db.transaction(async (transaction) => {
     // Fixture assets are per-home lazy rows; concurrent first uses converge.
     await transaction
       .insert(mediaAssets)
@@ -346,6 +323,8 @@ export async function createPhotoPost(
     await bumpPostAdditions(transaction, board.id);
     return toBoardPost({ ...post, storageKey: asset.storageKey });
   });
+  await boardChanged(board.id);
+  return created;
 }
 
 export async function editPostContent(
@@ -369,18 +348,14 @@ export async function editPostContent(
       backgroundColor: input.backgroundColor,
       updatedAt: new Date(),
     })
-    .where(
-      and(
-        eq(posts.id, postId),
-        eq(posts.boardId, post.boardId),
-        editablePosts(),
-      ),
-    )
+    .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)))
     .returning(postColumns);
   if (!row) {
-    await missedUpdate(postId, post.boardId, "edit");
+    throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
   }
-  return toBoardPost({ ...row, storageKey: null });
+  const edited = toBoardPost({ ...row, storageKey: null });
+  await boardChanged(edited.boardId);
+  return edited;
 }
 
 export async function movePost(
@@ -393,113 +368,335 @@ export async function movePost(
   const [row] = await db
     .update(posts)
     .set({ positionX: input.x, positionY: input.y, updatedAt: new Date() })
-    .where(
-      and(
-        eq(posts.id, postId),
-        eq(posts.boardId, post.boardId),
-        editablePosts(),
-      ),
-    )
+    .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)))
     .returning(postColumns);
   if (!row) {
-    await missedUpdate(postId, post.boardId, "move");
-  }
-  return toBoardPost({ ...row, storageKey: post.storageKey });
-}
-
-export async function requestRemoval(
-  user: CurrentUser,
-  homeId: string,
-  postId: string,
-): Promise<BoardPost> {
-  const post = await requirePost(user, homeId, postId);
-  if (post.kind !== "text") {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Photo notes archive instantly; only text notes use Undo.",
-    });
-  }
-  const [row] = await db
-    .update(posts)
-    .set({
-      deletionRequestedAt: sql`now()`,
-      deleteAfter: sql`now() + make_interval(secs => ${REMOVAL_RECOVERY_SECONDS})`,
-    })
-    .where(
-      and(
-        eq(posts.id, postId),
-        eq(posts.boardId, post.boardId),
-        isNull(posts.deletionRequestedAt),
-        visiblePosts(),
-      ),
-    )
-    .returning(postColumns);
-  if (row) return toBoardPost({ ...row, storageKey: null });
-  const existing = await findPostInBoard(postId, post.boardId);
-  if (!existing) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
   }
-  // Repeated removal is idempotent: the pending post comes back unchanged.
-  if (!isExpired(existing, new Date())) return toBoardPost(existing);
-  throw new TRPCError({
-    code: "CONFLICT",
-    message: "This post has already been removed.",
-  });
+  const moved = toBoardPost({ ...row, storageKey: post.storageKey });
+  await boardChanged(moved.boardId);
+  return moved;
 }
 
-export async function undoRemoval(
-  user: CurrentUser,
-  homeId: string,
-  postId: string,
-): Promise<BoardPost> {
-  const post = await requirePost(user, homeId, postId);
-  const [row] = await db
-    .update(posts)
-    .set({ deletionRequestedAt: null, deleteAfter: null })
-    .where(
-      and(
-        eq(posts.id, postId),
-        eq(posts.boardId, post.boardId),
-        gt(posts.deleteAfter, sql`now()`),
-      ),
-    )
-    .returning(postColumns);
-  if (row) return toBoardPost({ ...row, storageKey: post.storageKey });
-  const existing = await findPostInBoard(postId, post.boardId);
-  if (!existing) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
-  }
-  // Undoing a live post is a no-op success; only expiry is a conflict.
-  if (!isExpired(existing, new Date())) return toBoardPost(existing);
-  throw new TRPCError({
-    code: "CONFLICT",
-    message: "The one-hour Undo period has ended.",
-  });
-}
-
-export async function archivePhoto(
+// The single removal for every post kind: text notes are deleted, photos
+// are archived to the book store. The kind comes from the stored row, so
+// callers never branch on it; a new kind adds one case below.
+export async function removePost(
   user: CurrentUser,
   homeId: string,
   postId: string,
 ): Promise<{ postId: string }> {
   const post = await requirePost(user, homeId, postId);
-  if (post.kind !== "photo" || !post.mediaAssetId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Only photo notes can be archived.",
-    });
+  switch (post.kind) {
+    case "text": {
+      await db
+        .delete(posts)
+        .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)));
+      await boardChanged(post.boardId);
+      return { postId };
+    }
+    case "photo": {
+      if (!post.mediaAssetId) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Something went wrong. Please try again.",
+        });
+      }
+      const mediaAssetId = post.mediaAssetId;
+      await db.transaction(async (transaction) => {
+        await transaction
+          .delete(posts)
+          .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)));
+        await transaction.insert(bookEntries).values({
+          homeId,
+          mediaAssetId,
+          archivedFromPostId: postId,
+          archivedByUserId: user.id,
+        });
+      });
+      await boardChanged(post.boardId);
+      return { postId };
+    }
   }
-  const mediaAssetId = post.mediaAssetId;
-  await db.transaction(async (transaction) => {
-    await transaction
-      .delete(posts)
-      .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)));
-    await transaction.insert(bookEntries).values({
-      homeId,
-      mediaAssetId,
-      archivedFromPostId: postId,
-      archivedByUserId: user.id,
-    });
+  return assertNever(post.kind);
+}
+
+async function restorePost(
+  user: CurrentUser,
+  homeId: string,
+  boardId: string,
+  input: RestorePostInput,
+): Promise<BoardPost> {
+  const board = await requireBoard(user, homeId, boardId);
+  return db.transaction(async (transaction) => {
+    // Restoring the exact snapshot keeps the note's identity, position, and
+    // place in creation order; repeated Undos converge on the same row.
+    const inserted = await transaction
+      .insert(posts)
+      .values({
+        id: input.postId,
+        boardId: board.id,
+        creatorUserId: user.id,
+        kind: "text",
+        textContent: input.text,
+        mediaAssetId: null,
+        foregroundColor: input.foregroundColor,
+        backgroundColor: input.backgroundColor,
+        positionX: input.x,
+        positionY: input.y,
+        createdAt: input.createdAt,
+      })
+      .onConflictDoNothing()
+      .returning({ id: posts.id });
+    const [post] = await transaction
+      .select(postColumns)
+      .from(posts)
+      .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
+      .limit(1);
+    if (!post) throw new Error("Restored post lookup returned no row.");
+    if (inserted.length > 0) await bumpPostAdditions(transaction, board.id);
+    return toBoardPost({ ...post, storageKey: null });
   });
-  return { postId };
+}
+
+async function restorePhotoPost(
+  user: CurrentUser,
+  homeId: string,
+  boardId: string,
+  input: RestorePhotoPostInput,
+): Promise<BoardPost> {
+  const board = await requireBoard(user, homeId, boardId);
+  return db.transaction(async (transaction) => {
+    // Repeat Undos converge on the existing row instead of failing on the
+    // already-consumed book entry, mirroring the text restore.
+    const [existing] = await transaction
+      .select(withMedia(postColumns))
+      .from(posts)
+      .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
+      .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
+      .limit(1);
+    if (existing) return toBoardPost(existing);
+    // The archive wrote the image reference into the book store; only the
+    // entry for this post is consumed, so sibling posts sharing the same
+    // fixture asset are unaffected.
+    const [entry] = await transaction
+      .select({ mediaAssetId: bookEntries.mediaAssetId })
+      .from(bookEntries)
+      .where(
+        and(
+          eq(bookEntries.homeId, board.homeId),
+          eq(bookEntries.archivedFromPostId, input.postId),
+        ),
+      )
+      .limit(1);
+    if (!entry) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Archived photo not found.",
+      });
+    }
+    const inserted = await transaction
+      .insert(posts)
+      .values({
+        id: input.postId,
+        boardId: board.id,
+        creatorUserId: user.id,
+        kind: "photo",
+        textContent: null,
+        mediaAssetId: entry.mediaAssetId,
+        positionX: input.x,
+        positionY: input.y,
+        createdAt: input.createdAt,
+      })
+      .onConflictDoNothing()
+      .returning({ id: posts.id });
+    await transaction
+      .delete(bookEntries)
+      .where(
+        and(
+          eq(bookEntries.homeId, board.homeId),
+          eq(bookEntries.archivedFromPostId, input.postId),
+        ),
+      );
+    const [post] = await transaction
+      .select(withMedia(postColumns))
+      .from(posts)
+      .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
+      .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
+      .limit(1);
+    if (!post) throw new Error("Restored post lookup returned no row.");
+    if (inserted.length > 0) await bumpPostAdditions(transaction, board.id);
+    return toBoardPost(post);
+  });
+}
+
+// The single Undo for every post kind. The client's snapshot carries the
+// discriminator, so the router stays thin; a new kind adds one case here
+// plus its per-kind handler above.
+export async function restoreAnyPost(
+  user: CurrentUser,
+  homeId: string,
+  boardId: string,
+  input: RestoreAnyPostInput,
+): Promise<BoardPost> {
+  switch (input.kind) {
+    case "text": {
+      const restored = await restorePost(user, homeId, boardId, input);
+      await boardChanged(restored.boardId);
+      return restored;
+    }
+    case "photo": {
+      const restored = await restorePhotoPost(user, homeId, boardId, input);
+      await boardChanged(restored.boardId);
+      return restored;
+    }
+  }
+  return assertNever(input);
+}
+
+// Fan-out after every board mutation: invalidate first so subscribers'
+// refetches rebuild from fresh Postgres rows, then publish. Membership
+// changes reuse it so a revoked member's stream ends at once.
+export async function boardChanged(boardId: string): Promise<void> {
+  await invalidateBoardCache(boardId);
+  await publishBoardEvent(boardId, {
+    type: "board-changed",
+    boardId,
+  } satisfies BoardEvent);
+}
+
+async function publishPresence(boardId: string): Promise<void> {
+  const viewers = await currentViewers(boardId);
+  await publishBoardEvent(boardId, {
+    type: "presence",
+    boardId,
+    viewers,
+  } satisfies BoardEvent);
+}
+
+// Viewer payloads cross Redis as untyped JSON, so they re-enter through
+// zod here (and only here) before any subscriber sees them.
+async function currentViewers(boardId: string): Promise<BoardViewer[]> {
+  const viewers = await listBoardViewers(boardId);
+  const parsed = boardViewerSchema.array().safeParse(viewers);
+
+  if (!parsed.success) {
+    console.error("Dropping presence viewers that fail validation.");
+    return [];
+  }
+
+  return parsed.data;
+}
+
+// The board's event stream: joins presence, yields the current viewers,
+// then yields validated room events. Membership is rechecked before each
+// event so a revoked member's stream ends at the next event instead of
+// leaking further updates. Joins, leaves, and refreshes tell the room only
+// when the viewer set actually changes.
+export async function* watchBoard(
+  user: CurrentUser,
+  homeId: string,
+  boardId: string,
+): AsyncGenerator<BoardEvent> {
+  const board = await requireBoard(user, homeId, boardId);
+  const viewer = {
+    userId: user.id,
+    displayName: user.displayName,
+    email: user.email,
+  };
+
+  const alreadyLive = await isBoardViewerLive(board.id, user.id);
+  await refreshBoardPresence(board.id, viewer);
+
+  if (!alreadyLive) await publishPresence(board.id);
+  
+  const queue: BoardEvent[] = [];
+  let wake: (() => void) | null = null;
+
+  const unsubscribe = await subscribeToBoard(board.id, (event) => {
+    const parsed = boardEventSchema.safeParse(event);
+
+    if (!parsed.success) {
+      console.error("Dropping board event that fails validation.");
+      return;
+    }
+
+    queue.push(parsed.data);
+    wake?.();
+  });
+
+  try {
+    yield {
+      type: "presence",
+      boardId: board.id,
+      viewers: await currentViewers(board.id),
+    } satisfies BoardEvent;
+    for (;;) {
+      while (queue.length > 0) {
+        const event = queue.shift();
+
+        if (!event) break;
+
+        const membership = await findBoardForMember(user.id, homeId, boardId);
+        // Throwing (not silently ending) tells the client to refetch, and
+        // the refetch 404s into the "Home not found" screen: access ends
+        // immediately and visibly, matching the HTTP behavior.
+        if (!membership) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Home not found.",
+          });
+        }
+        yield event;
+      }
+      // The executor runs synchronously, so a push can only land before
+      // (queue non-empty, the loop continues) or after (wake is set).
+      await new Promise<void>((resolve) => {
+        wake = resolve;
+      });
+
+      wake = null;
+    }
+  } finally {
+    wake = null;
+
+    await unsubscribe();
+
+    const wasLive = await isBoardViewerLive(board.id, user.id);
+
+    await leaveBoardPresence(board.id, user.id);
+
+    if (wasLive) await publishPresence(board.id);
+  }
+}
+
+// Refreshes the caller's presence and returns the viewer list. Broadcasts
+// only when the caller is new: steady-state refreshes stay quiet, and
+// stragglers converge on their own next refresh.
+export async function refreshPresence(
+  user: CurrentUser,
+  homeId: string,
+  boardId: string,
+): Promise<BoardPresenceEvent> {
+  const board = await requireBoard(user, homeId, boardId);
+
+  const viewer = {
+    userId: user.id,
+    displayName: user.displayName,
+    email: user.email,
+  };
+
+  const alreadyLive = await isBoardViewerLive(board.id, user.id);
+  await refreshBoardPresence(board.id, viewer);
+  const viewers = await currentViewers(board.id);
+
+  const event = {
+    type: "presence",
+    boardId: board.id,
+    viewers,
+  } satisfies BoardPresenceEvent;
+
+  if (!alreadyLive) await publishBoardEvent(board.id, event);
+
+  return event;
 }

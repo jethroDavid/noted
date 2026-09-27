@@ -72,11 +72,8 @@ CREATE TABLE "posts" (
 	"position_y" double precision NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deletion_requested_at" timestamp with time zone,
-	"delete_after" timestamp with time zone,
 	CONSTRAINT "posts_normalized_position" CHECK ("posts"."position_x" between 0 and 1 and "posts"."position_y" between 0 and 1),
-	CONSTRAINT "posts_content_matches_kind" CHECK (("posts"."kind" = 'text' and "posts"."text_content" is not null and "posts"."media_asset_id" is null) or ("posts"."kind" = 'photo' and "posts"."text_content" is null and "posts"."media_asset_id" is not null)),
-	CONSTRAINT "posts_deletion_pair" CHECK (("posts"."deletion_requested_at" is null and "posts"."delete_after" is null) or ("posts"."deletion_requested_at" is not null and "posts"."delete_after" is not null and "posts"."delete_after" > "posts"."deletion_requested_at"))
+	CONSTRAINT "posts_content_matches_kind" CHECK (("posts"."kind" = 'text' and "posts"."text_content" is not null and "posts"."media_asset_id" is null) or ("posts"."kind" = 'photo' and "posts"."text_content" is null and "posts"."media_asset_id" is not null))
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
@@ -108,6 +105,5 @@ CREATE INDEX "home_memberships_user_idx" ON "home_memberships" USING btree ("use
 CREATE UNIQUE INDEX "media_assets_home_storage_key_unique" ON "media_assets" USING btree ("home_id","storage_key");--> statement-breakpoint
 CREATE INDEX "media_assets_home_idx" ON "media_assets" USING btree ("home_id");--> statement-breakpoint
 CREATE INDEX "posts_board_created_idx" ON "posts" USING btree ("board_id","created_at");--> statement-breakpoint
-CREATE INDEX "posts_delete_after_idx" ON "posts" USING btree ("delete_after");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_auth_subject_unique" ON "users" USING btree ("auth_subject");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_email_unique" ON "users" USING btree ("email");

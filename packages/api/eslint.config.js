@@ -16,7 +16,7 @@ export default [
                 "@noted/web/**",
               ],
               message:
-                "packages/api must only import the auth, db, and validators libraries (see README Layout).",
+                "packages/api must only import the auth, db, domain, realtime, and validators libraries (see README Layout).",
             },
           ],
         },

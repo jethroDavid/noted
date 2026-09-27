@@ -9,6 +9,9 @@ import {
   normalizedCoordinateSchema,
   photoFixtureKeySchema,
   postTextSchema,
+  restoreAnyPostSchema,
+  restorePhotoPostSchema,
+  restorePostSchema,
   updatePostContentSchema,
   updatePostPositionSchema,
 } from "./index";
@@ -124,6 +127,147 @@ describe("updatePostPositionSchema", () => {
   });
 });
 
+describe("restorePostSchema", () => {
+  it("accepts a full snapshot", () => {
+    const createdAt = new Date("2026-09-26T10:00:00.000Z");
+    expect(
+      restorePostSchema.parse({
+        postId: "00000000-0000-4000-8000-000000000001",
+        text: "restored",
+        foregroundColor: "#33352e",
+        backgroundColor: "#f5dfa0",
+        x: 0.5,
+        y: 0.5,
+        createdAt,
+      }),
+    ).toEqual({
+      postId: "00000000-0000-4000-8000-000000000001",
+      text: "restored",
+      foregroundColor: "#33352e",
+      backgroundColor: "#f5dfa0",
+      x: 0.5,
+      y: 0.5,
+      createdAt,
+    });
+  });
+
+  it("requires the original id", () => {
+    expect(
+      restorePostSchema.safeParse({
+        text: "restored",
+        foregroundColor: "#33352e",
+        backgroundColor: "#f5dfa0",
+        x: 0.5,
+        y: 0.5,
+        createdAt: new Date(),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("restorePhotoPostSchema", () => {
+  it("accepts a position snapshot", () => {
+    const createdAt = new Date("2026-09-26T10:00:00.000Z");
+    expect(
+      restorePhotoPostSchema.parse({
+        postId: "00000000-0000-4000-8000-000000000001",
+        x: 0.5,
+        y: 0.5,
+        createdAt,
+      }),
+    ).toEqual({
+      postId: "00000000-0000-4000-8000-000000000001",
+      x: 0.5,
+      y: 0.5,
+      createdAt,
+    });
+  });
+
+  it("requires the original id and in-range coordinates", () => {
+    expect(
+      restorePhotoPostSchema.safeParse({
+        x: 0.5,
+        y: 0.5,
+        createdAt: new Date(),
+      }).success,
+    ).toBe(false);
+    expect(
+      restorePhotoPostSchema.safeParse({
+        postId: "00000000-0000-4000-8000-000000000001",
+        x: 2,
+        y: 0.5,
+        createdAt: new Date(),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("restoreAnyPostSchema", () => {
+  it("accepts the text variant", () => {
+    const createdAt = new Date("2026-09-26T10:00:00.000Z");
+    expect(
+      restoreAnyPostSchema.parse({
+        kind: "text",
+        postId: "00000000-0000-4000-8000-000000000001",
+        text: "restored",
+        foregroundColor: "#33352e",
+        backgroundColor: "#f5dfa0",
+        x: 0.5,
+        y: 0.5,
+        createdAt,
+      }),
+    ).toEqual({
+      kind: "text",
+      postId: "00000000-0000-4000-8000-000000000001",
+      text: "restored",
+      foregroundColor: "#33352e",
+      backgroundColor: "#f5dfa0",
+      x: 0.5,
+      y: 0.5,
+      createdAt,
+    });
+  });
+
+  it("accepts the photo variant", () => {
+    const createdAt = new Date("2026-09-26T10:00:00.000Z");
+    expect(
+      restoreAnyPostSchema.parse({
+        kind: "photo",
+        postId: "00000000-0000-4000-8000-000000000001",
+        x: 0.5,
+        y: 0.5,
+        createdAt,
+      }),
+    ).toEqual({
+      kind: "photo",
+      postId: "00000000-0000-4000-8000-000000000001",
+      x: 0.5,
+      y: 0.5,
+      createdAt,
+    });
+  });
+
+  it("rejects a missing or unknown kind", () => {
+    expect(
+      restoreAnyPostSchema.safeParse({
+        postId: "00000000-0000-4000-8000-000000000001",
+        x: 0.5,
+        y: 0.5,
+        createdAt: new Date(),
+      }).success,
+    ).toBe(false);
+    expect(
+      restoreAnyPostSchema.safeParse({
+        kind: "voice",
+        postId: "00000000-0000-4000-8000-000000000001",
+        x: 0.5,
+        y: 0.5,
+        createdAt: new Date(),
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe("boardPostSchema", () => {
   it("discriminates text and photo posts", () => {
     const stamp = new Date("2026-09-26T10:00:00.000Z");
@@ -138,8 +282,6 @@ describe("boardPostSchema", () => {
       y: 0.5,
       createdAt: stamp,
       updatedAt: stamp,
-      deletionRequestedAt: null,
-      deleteAfter: null,
     });
     expect(text.kind).toBe("text");
     const photo = boardPostSchema.parse({

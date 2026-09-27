@@ -16,6 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { CurrentUser } from "./identity";
 import { normalizeEmail } from "./identity";
+import { boardChanged } from "./posts";
 
 interface HomeRow {
   id: string;
@@ -317,6 +318,8 @@ export async function removeMember(
   if (!removed) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
   }
+  // Publish so the removed member's stream rechecks and ends at once.
+  await boardChanged(home.boardId);
   return { userId: removed.userId };
 }
 
@@ -339,5 +342,7 @@ export async function leaveHome(
         eq(homeMemberships.userId, user.id),
       ),
     );
+  // Publish so the leaver's stream (and everyone else's views) settle.
+  await boardChanged(home.boardId);
   return { homeId: home.id };
 }

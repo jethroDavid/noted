@@ -11,11 +11,19 @@ Prereqs: Node 24, pnpm 10, Docker.
 ```sh
 pnpm install
 cp .env.example .env   # fill in real values; never commit .env
-pnpm run setup        # starts Postgres, runs migrations (`run` avoids pnpm's builtin)
+pnpm run setup        # starts Postgres + Redis, runs migrations (`run` avoids pnpm's builtin)
 pnpm dev:web           # Next.js app with the tRPC hello round-trip
 ```
 
 The dev server uses `PORT` from `.env` (3000). If that port is taken on your machine, change it there.
+
+## Realtime
+
+The board streams over SSE (`boards.onEvent` on `/api/trpc`) with Redis
+fan-out. Local realtime needs zero config beyond the stack itself:
+`pnpm dev:web` serves streaming subscriptions with no CLI or login. If
+the pill shows Offline, the stream — not the board — is broken. See
+`docs/plans/phase-2-live-review.md`.
 
 ## Gates
 
@@ -31,12 +39,13 @@ CI mirrors the same five tasks. Nothing merges red.
 - `packages/api` — tRPC routers, the only API definition.
 - `packages/db` — Drizzle schema, client, migrations.
 - `packages/domain` — shared domain rules (removal window, coordinates).
+- `packages/realtime` — Redis-backed realtime (room pub/sub, board cache, presence).
 - `packages/auth` — Firebase server seam (verify ID tokens) and env.
 - `packages/validators` — pure zod schemas shared by API and app.
 - `packages/ui` — shared visual components.
 - `tooling/*` — shared tsconfig, eslint, prettier, tailwind configs plus the CI setup action.
 
-Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` → `auth`/`db`/`domain`/`validators`, enforced by lint.
+Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` → `auth`/`db`/`domain`/`realtime`/`validators`, enforced by lint.
 
 ## Database workflow
 

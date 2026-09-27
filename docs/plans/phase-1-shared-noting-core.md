@@ -2,21 +2,24 @@
 
 Started 2026-09-26. PLAN.md §4 fixes the scope; this note works out the
 details (§5: "phase details are worked out when each phase starts").
-Carried interaction model: v1 (`archive/noted-v1`) semantics for removal,
-Undo, membership checks, and clocks; tRPC + zod is the only API definition.
+Carried interaction model: v1 (`archive/noted-v1`) semantics for membership
+checks and clocks; delete is instant with a 10-second Undo toast (the v1
+grey-removal window was dropped per owner direction 2026-09-26); tRPC +
+zod is the only API definition.
 
 ## Scope
 
 - Google auth (Firebase client sign-in; server seam verifies ID tokens in
   tRPC context; verified users upserted, email invitations claimed).
 - Homes + members + invitations (creator manages, members note).
-- Fridge text notes: create, modal edit, drag move, one-hour grey removal
-  with shared Undo. Last-save-wins; per-operation membership checks;
-  server-anchored countdown; expired posts filtered from reads (physical
-  delete deferred to the Phase 3 cleanup worker).
+- Fridge text notes: create, modal edit, drag move, instant delete with a
+  10-second Undo toast (exact-snapshot restore). Last-save-wins;
+  per-operation membership checks.
 - Fridge photo notes: created from bundled fixtures (uploads + S3 land in
-  Phase 3); removal instantly archives to the book store. No Undo, nothing
-  lost (Phase 3 book UI recovers them).
+  Phase 3); removal instantly archives to the book store with a 10-second
+  Undo toast, like text notes (Undo restores the exact snapshot to the
+  board and consumes the book entry). Nothing lost either way (Phase 3
+  book UI recovers un-undone photos).
 - Temporary refetch transport (polling; removed in Phase 2).
 - Seed + fixtures: bundled fridge photos, sample reels, starter notes.
 - Book UI, reels UI, uploads, workers: explicitly Phase 3.
@@ -26,7 +29,7 @@ Undo, membership checks, and clocks; tRPC + zod is the only API definition.
 Port the v1 schema minus voice: `users`, `homes`, `home_memberships`,
 `home_invitations`, `boards` (fridge), `media_assets` (kind `photo`;
 `(homeId, storageKey)` unique so fixture rows are per-home lazy),
-`posts` (kind `text` | `photo`; deletion stamps text-only), plus new
+`posts` (kind `text` | `photo`), plus new
 `book_entries` (the Phase 3-readable archive store). Drop `heartbeat`.
 
 Seed (`db` package, `seed` turbo task via tsx):
@@ -44,12 +47,12 @@ one archived photo. Idempotent per creator home name.
   failures; user sync stays in `api` (auth keeps zero internal deps).
 - Context carries the verified app user (upsert + claim invitations per
   request, as v1); `protectedProcedure` rejects anonymous callers.
-- Services throw `TRPCError` with v1 semantics and messages: 404 hides
-  non-member resources; edits/moves on greyed-out posts 409; removal
-  idempotent; undo on live posts no-op success; post-expiry ops 409.
+- Services throw `TRPCError`: 404 hides non-member resources and missing
+  posts; kind-mismatched ops 400; restore is idempotent.
 - Routers: `me.get`; `homes.list/create/get/rename/invite/revokeInvitation/
 removeMember/leave`; `boards.get/createText/createPhoto/editContent/move/
-requestRemoval/undoRemoval/archivePhoto`. Board read returns
+removePost/restorePost` (one kind-agnostic removal and Undo; the server
+  branches on the stored kind). Board read returns
   `{board, posts, serverTime}`; photo posts resolve fixture URLs.
 
 ## Web (`apps/web`, `packages/ui`)
@@ -60,9 +63,8 @@ requestRemoval/undoRemoval/archivePhoto`. Board read returns
   members panel for invite/revoke/remove).
 - Board: fixed kitchen scene in `BoardStage` (extracted v1 art, flat
   fallback when art fails); draggable cards with preview-then-commit;
-  text modal; fixture photo picker; grey + Undo countdown from a client
-  tick (display-only; expiry is enforced by database time); refetch-interval
-  transport.
+  text modal; fixture photo picker; instant delete with a 10-second
+  Undo toast; refetch-interval transport.
 - Board components live in app features (single shell in the demo);
   `packages/ui` keeps primitives + the scene stage.
 

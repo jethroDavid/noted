@@ -1,7 +1,7 @@
-import reactConfig from "@noted/eslint-config/react";
+import base from "@noted/eslint-config/base";
 
 export default [
-  ...reactConfig,
+  ...base,
   {
     rules: {
       "no-restricted-imports": [
@@ -28,7 +28,7 @@ export default [
                 "@noted/web/**",
               ],
               message:
-                "packages/ui must not import other workspace libraries (see README Layout).",
+                "packages/realtime must not import other workspace libraries (see README Layout).",
             },
           ],
         },

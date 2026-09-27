@@ -25,15 +25,19 @@ Browser A (account A) + a second browser or profile (account B):
 2. A invites B by email (Members panel); B reloads `/app` → home appears.
 3. A adds a text note → it appears in B within ~2s (poll transport).
 4. B drags the note → position lands in A within ~2s.
-5. A removes the note → grey + countdown in both; B presses Undo → live.
-6. A sticks a photo → visible in B; A archives it → gone from the board.
+5. A deletes the note → it vanishes in both within ~2s; an Undo toast
+   shows in A for 10 seconds; A presses Undo → the note returns in both.
+6. A sticks a photo → visible in B; A archives it → gone from the board,
+   an Undo toast shows in A for 10 seconds; A presses Undo → the photo
+   returns in both (and leaves the book store).
 7. A revokes/removes or B leaves; access ends immediately.
 
 ## Known Phase 1 limits (not failures)
 
 - ~2s delay on every shared update (polling; Phase 2 replaces it).
 - Fixture photos are ~2MB (no thumbnails until Phase 3).
-- Countdown is minute-precision display; the window is enforced server-side.
+- Undo snapshots live in the deleter's browser tab; reloading inside the
+  10 seconds loses them.
 - No book UI yet (Phase 3) — archiving is verified at the data layer.
 
 ## Sign-off

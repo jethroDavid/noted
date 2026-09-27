@@ -18,6 +18,8 @@ export default [
                 "@noted/db/**",
                 "@noted/domain",
                 "@noted/domain/**",
+                "@noted/realtime",
+                "@noted/realtime/**",
                 "@noted/ui",
                 "@noted/ui/**",
                 "@noted/validators",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1),
+  REDIS_URL: z.string().min(1),
   FIREBASE_SERVICE_ACCOUNT_KEY_INLINE: z.string().min(1),
   NEXT_PUBLIC_FIREBASE_API_KEY: z.string().min(1),
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: z.string().min(1),

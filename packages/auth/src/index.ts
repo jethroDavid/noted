@@ -63,7 +63,7 @@ export async function verifyIdToken(
     decoded = await adminAuth().verifyIdToken(idToken, true);
   } catch (error) {
     if (error instanceof AuthError) throw error;
-  
+
     throw new AuthError(
       "UNAUTHENTICATED",
       "Your sign-in expired. Please sign in again.",

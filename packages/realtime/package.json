@@ -1,5 +1,5 @@
 {
-  "name": "@noted/api",
+  "name": "@noted/realtime",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,26 +10,17 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@noted/auth": "workspace:*",
-    "@noted/db": "workspace:*",
-    "@noted/domain": "workspace:*",
-    "@noted/realtime": "workspace:*",
-    "@noted/validators": "workspace:*",
-    "@trpc/server": "catalog:",
-    "drizzle-orm": "catalog:",
-    "superjson": "^2.2.6",
-    "zod": "catalog:"
-  },
   "devDependencies": {
     "@noted/eslint-config": "workspace:*",
     "@noted/prettier-config": "workspace:*",
     "@noted/tsconfig": "workspace:*",
-    "@trpc/client": "catalog:",
     "@types/node": "catalog:",
-    "eventsource": "^5.1.2",
     "typescript": "catalog:",
     "vitest": "^5.0.1"
   },
-  "prettier": "@noted/prettier-config"
+  "prettier": "@noted/prettier-config",
+  "dependencies": {
+    "ioredis": "^6.0.0",
+    "superjson": "^2.2.6"
+  }
 }

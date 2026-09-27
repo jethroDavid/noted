@@ -80,6 +80,8 @@ Standing demo-scope defaults (vetoable): fixed kitchen scene with the theme syst
 
 Q2 settled (chat 2026-09-24): owner picked option 1 — Vercel-native WebSockets (public beta via `experimental_upgradeWebSocket()` on Fluid Compute) with Redis pub/sub fan-out for cross-instance delivery. Accepted caveats: connections die at function max duration (client reconnects), beta status, Fluid billing. Research behind the options: multiple 2026 sources confirm the beta and Vercel's Redis-fan-out guidance; official docs inspected at plan time (see revised PLAN.md sources).
 
+Q2 transport superseded (chat 2026-09-26): owner picked SSE — tRPC subscriptions over EventSource on `/api/trpc` — over the WebSocket beta. Equally capable for one-way event taps, zero local config, no CLI or login. Redis fan-out unchanged. See PLAN.md and `docs/plans/phase-2-realtime-backbone.md`.
+
 Q3 resolved by default (veto at plan approval, no question asked): queue provider is Upstash QStash (same vendor as Redis, Vercel marketplace, HTTP delivery to API-route workers, zero new infra); initial job list is media processing (photo thumbnails, reels poster frames, variant cleanup on removal). Rationale: the demo needs the queue/worker categories, not a specific logo; vendor consolidation keeps the realtime backbone, cache, and queue on one integration.
 
 Amendment interview closed 2026-09-24: no unresolved items; revised PLAN.md carries the details for approval.

@@ -14,6 +14,7 @@ const config: NextConfig = {
     "@noted/auth",
     "@noted/db",
     "@noted/domain",
+    "@noted/realtime",
     "@noted/ui",
     "@noted/validators",
   ],

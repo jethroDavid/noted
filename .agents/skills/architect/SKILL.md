@@ -11,7 +11,7 @@ You are the architecture gate for this repo. Load this skill before creating pac
 
 - pnpm + Turbo v2 pipeline (`turbo.json`): `build`, `dev`, `lint`, `typecheck`, `format` run through turbo with shared caching; CI mirrors the same gates.
 - `apps/*`: thin platform shells (Next.js web first; Electron/Capacitor later — never Expo). Shells own SDKs, auth adapters, env wiring, and navigation only.
-- `packages/*`: one responsibility each — `api` (tRPC routers), `db` (Drizzle schema + client), `domain` (shared domain rules: time windows, coordinates), `validators` (pure zod schemas), `ui` (shared visuals), plus shared `tsconfig` / `eslint-config` / `prettier-config` / `tailwind-config`. No package grows a second job; split instead.
+- `packages/*`: one responsibility each — `api` (tRPC routers), `db` (Drizzle schema + client), `domain` (shared domain rules: time windows, coordinates), `realtime` (Redis-backed realtime: room pub/sub, board cache, presence), `validators` (pure zod schemas), `ui` (shared visuals), plus shared `tsconfig` / `eslint-config` / `prettier-config` / `tailwind-config`. No package grows a second job; split instead.
 - Env: dotenv-loaded root `.env` plus typed env validation per app; server secrets never cross into client code.
 
 ## Hard rules
@@ -22,7 +22,7 @@ You are the architecture gate for this repo. Load this skill before creating pac
 4. Drizzle owns persistence: schema plus migrations in `db`, one client, no raw SQL outside migrations and seed.
 5. Styling: Tailwind utilities for UI; bespoke CSS only for the board art layer.
 6. Theme system rules: fixed board and CSS slots; a theme is art plus a validated manifest JSON; theme changes are creator-only; posts keep their colors across theme switches.
-7. Dependency direction: apps depend on `api`, which depends on `auth`, `db`, `domain`, and `validators`; `auth`, `db`, `domain`, `ui`, and `validators` depend on nothing internal. Lint must enforce it; flag any new edge that breaks the direction.
+7. Dependency direction: apps depend on `api`, which depends on `auth`, `db`, `domain`, `realtime`, and `validators`; `auth`, `db`, `domain`, `realtime`, `ui`, and `validators` depend on nothing internal. Lint must enforce it; flag any new edge that breaks the direction.
 
 ## On every structural change
 
