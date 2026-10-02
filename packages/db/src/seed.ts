@@ -1,32 +1,26 @@
+import "server-only";
 // One-command demo content: user + "Family Kitchen" home + starter notes.
 // Usage: pnpm db:seed -- --email owner@example.com --subject <firebase-uid>
 // Run after the owner's first Google sign-in (the uid comes from the Firebase
 // console); matching is by email so sign-in order does not matter.
-// Fixture keys mirror PHOTO_FIXTURES in @noted/domain (this leaf package
-// cannot import it); storage keys stay identical by construction below.
 import { statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { and, eq } from "drizzle-orm";
 import {
   boards,
-  bookEntries,
   db,
   homeMemberships,
   homes,
   mediaAssets,
   posts,
+  reels,
   users,
 } from "./index";
 
-const FIXTURES = [
-  { key: "lake", file: "lake.jpg", contentType: "image/jpeg" },
-  { key: "living-room", file: "living-room.png", contentType: "image/png" },
-  {
-    key: "moonlit-bedroom",
-    file: "moonlit-bedroom.png",
-    contentType: "image/png",
-  },
+const REEL_FIXTURES = [
+  { file: "bunny-360.mp4", contentType: "video/mp4" },
+  { file: "flower.mp4", contentType: "video/mp4" },
 ] as const;
 
 const STARTER_NOTES = [
@@ -78,6 +72,48 @@ function fixtureByteSize(file: string): number {
   }
 }
 
+// Idempotent: repeat or concurrent seeds converge on one asset and one
+// reel per fixture, so existing homes gain the sample reels on re-seed.
+async function ensureFixtureReels(homeId: string, userId: string) {
+  for (const reel of REEL_FIXTURES) {
+    const storageKey = `fixtures/reels/${reel.file}`;
+    await db
+      .insert(mediaAssets)
+      .values({
+        homeId,
+        kind: "video",
+        state: "attached",
+        storageKey,
+        contentType: reel.contentType,
+        byteSize: fixtureByteSize(`reels/${reel.file}`),
+        width: null,
+        height: null,
+      })
+      .onConflictDoNothing();
+    const [asset] = await db
+      .select()
+      .from(mediaAssets)
+      .where(
+        and(
+          eq(mediaAssets.homeId, homeId),
+          eq(mediaAssets.storageKey, storageKey),
+        ),
+      )
+      .limit(1);
+    if (!asset) throw new Error("Seed reel asset lookup returned no row.");
+    const [existing] = await db
+      .select({ id: reels.id })
+      .from(reels)
+      .where(and(eq(reels.homeId, homeId), eq(reels.mediaAssetId, asset.id)))
+      .limit(1);
+    if (!existing) {
+      await db
+        .insert(reels)
+        .values({ homeId, mediaAssetId: asset.id, creatorUserId: userId });
+    }
+  }
+}
+
 async function main() {
   const email = readArg("email").trim().toLowerCase();
   const authSubject = readArg("subject");
@@ -107,7 +143,10 @@ async function main() {
     .where(and(eq(homes.creatorUserId, user.id), eq(homes.name, homeName)))
     .limit(1);
   if (existingHome) {
-    console.log(`Home "${homeName}" already exists; nothing to seed.`);
+    await ensureFixtureReels(existingHome.id, user.id);
+    console.log(
+      `Home "${homeName}" already exists; fixture reels ensured, nothing else to seed.`,
+    );
     process.exit(0);
   }
 
@@ -137,55 +176,15 @@ async function main() {
     })),
   );
 
-  const assets = await db
-    .insert(mediaAssets)
-    .values(
-      FIXTURES.map((fixture) => ({
-        homeId: home.id,
-        kind: "photo" as const,
-        state: "attached" as const,
-        storageKey: `fixtures/${fixture.file}`,
-        contentType: fixture.contentType,
-        byteSize: fixtureByteSize(fixture.file),
-        width: null,
-        height: null,
-      })),
-    )
-    .returning();
-  const lake = assets.find((asset) => asset.storageKey === "fixtures/lake.jpg");
-  const bedroom = assets.find(
-    (asset) => asset.storageKey === "fixtures/moonlit-bedroom.png",
-  );
-  if (!lake || !bedroom) throw new Error("Seed fixture assets missing.");
-
-  const [photoPost] = await db
-    .insert(posts)
-    .values({
-      boardId: board.id,
-      creatorUserId: user.id,
-      kind: "photo",
-      textContent: null,
-      mediaAssetId: lake.id,
-      positionX: 0.68,
-      positionY: 0.62,
-    })
-    .returning();
-  if (!photoPost) throw new Error("Seed photo post insert returned no row.");
-
-  await db.insert(bookEntries).values({
-    homeId: home.id,
-    mediaAssetId: bedroom.id,
-    archivedFromPostId: null,
-    archivedByUserId: user.id,
-  });
-
   await db
     .update(boards)
-    .set({ postAdditions: STARTER_NOTES.length + 1 })
+    .set({ postAdditions: STARTER_NOTES.length })
     .where(eq(boards.id, board.id));
 
+  await ensureFixtureReels(home.id, user.id);
+
   console.log(
-    `Seeded "${homeName}" (${home.id}) for ${email}: ${STARTER_NOTES.length} text notes, 1 photo note, 1 archived photo.`,
+    `Seeded "${homeName}" (${home.id}) for ${email}: ${STARTER_NOTES.length} text notes, ${REEL_FIXTURES.length} sample reels.`,
   );
   process.exit(0);
 }

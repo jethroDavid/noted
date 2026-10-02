@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   boardPostSchema,
-  createPhotoPostSchema,
   createTextPostSchema,
   helloInput,
   hexColorSchema,
   inviteEmailSchema,
   normalizedCoordinateSchema,
-  photoFixtureKeySchema,
   postTextSchema,
   restoreAnyPostSchema,
   restorePhotoPostSchema,
@@ -73,18 +71,6 @@ describe("normalizedCoordinateSchema", () => {
   });
 });
 
-describe("photoFixtureKeySchema", () => {
-  it("accepts the bundled fixtures", () => {
-    for (const key of ["lake", "living-room", "moonlit-bedroom"]) {
-      expect(photoFixtureKeySchema.parse(key)).toBe(key);
-    }
-  });
-
-  it("rejects unknown keys", () => {
-    expect(photoFixtureKeySchema.safeParse("lake.jpg").success).toBe(false);
-  });
-});
-
 describe("createTextPostSchema", () => {
   it("accepts a full note", () => {
     expect(
@@ -102,14 +88,6 @@ describe("createTextPostSchema", () => {
       x: 0.5,
       y: 0.5,
     });
-  });
-});
-
-describe("createPhotoPostSchema", () => {
-  it("accepts a fixture plus position", () => {
-    expect(
-      createPhotoPostSchema.parse({ fixture: "lake", x: 0.5, y: 0.5 }),
-    ).toEqual({ fixture: "lake", x: 0.5, y: 0.5 });
   });
 });
 
@@ -288,7 +266,9 @@ describe("boardPostSchema", () => {
       id: "00000000-0000-4000-8000-000000000001",
       boardId: "00000000-0000-4000-8000-000000000002",
       kind: "photo",
-      imageUrl: "/fixtures/lake.jpg",
+      status: "ready",
+      imageUrl: "https://example.test/full.jpg",
+      thumbnailUrl: "https://example.test/thumb.jpg",
       x: 0.5,
       y: 0.5,
       createdAt: stamp,
@@ -296,5 +276,22 @@ describe("boardPostSchema", () => {
     });
     expect(photo.kind).toBe("photo");
     expect(boardPostSchema.safeParse({ kind: "voice" }).success).toBe(false);
+  });
+
+  it("accepts a non-ready photo with null urls", () => {
+    const stamp = new Date("2026-09-26T10:00:00.000Z");
+    const parsed = boardPostSchema.safeParse({
+      id: "00000000-0000-4000-8000-000000000001",
+      boardId: "00000000-0000-4000-8000-000000000002",
+      kind: "photo",
+      status: "uploading",
+      imageUrl: null,
+      thumbnailUrl: null,
+      x: 0.5,
+      y: 0.5,
+      createdAt: stamp,
+      updatedAt: stamp,
+    });
+    expect(parsed.success).toBe(true);
   });
 });

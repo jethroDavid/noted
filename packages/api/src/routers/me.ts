@@ -1,3 +1,4 @@
+import "server-only";
 import { meResponseSchema } from "@noted/validators/src";
 import { listHomes } from "../services/homes";
 import { protectedProcedure, router } from "../trpc";

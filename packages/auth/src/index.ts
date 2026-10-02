@@ -1,3 +1,4 @@
+import "server-only";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { env } from "./env";

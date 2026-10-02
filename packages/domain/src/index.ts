@@ -6,50 +6,18 @@ export function clampNormalizedCoordinate(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-export interface PhotoFixture {
-  key: string;
-  file: string;
-  label: string;
-  contentType: string;
-  byteSize: number;
-}
+// Display state for an upload-backed asset, shared by photo posts (variant
+// = thumbnailKey) and reels (variant = posterKey). Bundled keys skip
+// processing: their originals serve every size, so an attached one is ready.
+export type MediaDisplayStatus = "uploading" | "processing" | "ready";
 
-// Canonical bundled-fridge-photo catalog (Phase 1; uploads land in Phase 3).
-// Files live in apps/web/public/fixtures. Validators mirrors the keys as a
-// zod enum (it cannot import this leaf's sibling); an api test guards parity.
-// Byte sizes are the measured fixture files; re-measure if a file changes.
-export const PHOTO_FIXTURES = [
-  {
-    key: "lake",
-    file: "lake.jpg",
-    label: "Lake",
-    contentType: "image/jpeg",
-    byteSize: 206545,
-  },
-  {
-    key: "living-room",
-    file: "living-room.png",
-    label: "Living room",
-    contentType: "image/png",
-    byteSize: 2403693,
-  },
-  {
-    key: "moonlit-bedroom",
-    file: "moonlit-bedroom.png",
-    label: "Moonlit bedroom",
-    contentType: "image/png",
-    byteSize: 2368022,
-  },
-] as const satisfies readonly PhotoFixture[];
-
-export type PhotoFixtureKey = (typeof PHOTO_FIXTURES)[number]["key"];
-
-export function photoFixtureStorageKey(key: string): string {
-  const fixture = PHOTO_FIXTURES.find((candidate) => candidate.key === key);
-  if (!fixture) throw new Error(`Unknown photo fixture: ${key}`);
-  return `fixtures/${fixture.file}`;
-}
-
-export function photoFixtureImageUrl(key: string): string {
-  return `/${photoFixtureStorageKey(key)}`;
+export function mediaDisplayStatus(asset: {
+  state: string;
+  storageKey: string;
+  variantKey: string | null;
+}): MediaDisplayStatus {
+  if (asset.state !== "attached") return "uploading";
+  if (asset.variantKey !== null) return "ready";
+  if (asset.storageKey.startsWith("fixtures/")) return "ready";
+  return "processing";
 }

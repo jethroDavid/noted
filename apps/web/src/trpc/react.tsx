@@ -92,7 +92,10 @@ function useAccountScopedClient() {
       const uid = user?.uid ?? null;
       if (uid === lastUid) return;
       lastUid = uid;
-      setClient(createClient());
+      // The tRPC client is a function-typed proxy: passing it to setState
+      // directly would make React call it as an updater and store
+      // undefined. Wrap it so the proxy itself becomes the state.
+      setClient(() => createClient());
     });
   }, []);
 

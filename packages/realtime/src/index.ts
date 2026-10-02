@@ -1,3 +1,5 @@
+import "server-only";
+
 export { commands, createSubscriber } from "./redis";
 export {
   invalidateBoardCache,
@@ -14,4 +16,11 @@ export {
   presenceLastSeenKey,
 } from "./presence";
 export type { PresenceViewer } from "./presence";
-export { boardChannel, publishBoardEvent, subscribeToBoard } from "./rooms";
+export {
+  boardChannel,
+  homeChannel,
+  publishBoardEvent,
+  publishHomeEvent,
+  subscribeToBoard,
+  subscribeToHome,
+} from "./rooms";

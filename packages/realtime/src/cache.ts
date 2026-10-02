@@ -1,3 +1,4 @@
+import "server-only";
 import superjson from "superjson";
 import { commands } from "./redis";
 

@@ -14,10 +14,13 @@
     "@noted/auth": "workspace:*",
     "@noted/db": "workspace:*",
     "@noted/domain": "workspace:*",
+    "@noted/media": "workspace:*",
+    "@noted/queue": "workspace:*",
     "@noted/realtime": "workspace:*",
     "@noted/validators": "workspace:*",
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
+    "server-only": "catalog:",
     "superjson": "^2.2.6",
     "zod": "catalog:"
   },

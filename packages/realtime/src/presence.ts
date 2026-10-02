@@ -1,3 +1,4 @@
+import "server-only";
 import superjson from "superjson";
 import { commands } from "./redis";
 
@@ -61,10 +62,7 @@ export async function isBoardViewerLive(
   userId: string,
 ): Promise<boolean> {
   try {
-    const score = await commands.zscore(
-      presenceLastSeenKey(boardId),
-      userId,
-    );
+    const score = await commands.zscore(presenceLastSeenKey(boardId), userId);
     return score !== null && Number(score) > Date.now() - PRESENCE_WINDOW_MS;
   } catch (error) {
     // Fail-open toward publishing: unknown reads as absent so callers keep

@@ -1,0 +1,27 @@
+{
+  "name": "@noted/queue",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./src": "./src/index.ts"
+  },
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
+  },
+  "prettier": "@noted/prettier-config",
+  "dependencies": {
+    "@upstash/qstash": "^2.11.3",
+    "server-only": "catalog:",
+    "zod": "catalog:"
+  }
+}

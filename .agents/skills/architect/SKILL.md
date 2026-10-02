@@ -11,7 +11,7 @@ You are the architecture gate for this repo. Load this skill before creating pac
 
 - pnpm + Turbo v2 pipeline (`turbo.json`): `build`, `dev`, `lint`, `typecheck`, `format` run through turbo with shared caching; CI mirrors the same gates.
 - `apps/*`: thin platform shells (Next.js web first; Electron/Capacitor later — never Expo). Shells own SDKs, auth adapters, env wiring, and navigation only.
-- `packages/*`: one responsibility each — `api` (tRPC routers), `db` (Drizzle schema + client), `domain` (shared domain rules: time windows, coordinates), `realtime` (Redis-backed realtime: room pub/sub, board cache, presence), `validators` (pure zod schemas), `ui` (shared visuals), plus shared `tsconfig` / `eslint-config` / `prettier-config` / `tailwind-config`. No package grows a second job; split instead.
+- `packages/*`: one responsibility each — `api` (tRPC routers), `db` (Drizzle schema + client), `domain` (shared domain rules: time windows, coordinates), `media` (S3 object storage plus image/video variants), `queue` (QStash publishers, job schemas, worker verification), `realtime` (Redis-backed realtime: room pub/sub, board cache, presence), `validators` (pure zod schemas), `ui` (shared visuals), plus shared `tsconfig` / `eslint-config` / `prettier-config` / `tailwind-config`. No package grows a second job; split instead.
 - Env: dotenv-loaded root `.env` plus typed env validation per app; server secrets never cross into client code.
 
 ## Hard rules
@@ -22,7 +22,8 @@ You are the architecture gate for this repo. Load this skill before creating pac
 4. Drizzle owns persistence: schema plus migrations in `db`, one client, no raw SQL outside migrations and seed.
 5. Styling: Tailwind utilities for UI; bespoke CSS only for the board art layer.
 6. Theme system rules: fixed board and CSS slots; a theme is art plus a validated manifest JSON; theme changes are creator-only; posts keep their colors across theme switches.
-7. Dependency direction: apps depend on `api`, which depends on `auth`, `db`, `domain`, `realtime`, and `validators`; `auth`, `db`, `domain`, `realtime`, `ui`, and `validators` depend on nothing internal. Lint must enforce it; flag any new edge that breaks the direction.
+7. Dependency direction: apps depend on `api` and `queue` (worker routes verify through it), while `api` depends on `auth`, `db`, `domain`, `media`, `queue`, `realtime`, and `validators`; `auth`, `db`, `domain`, `media`, `queue`, `realtime`, `ui`, and `validators` depend on nothing internal. Lint must enforce it; flag any new edge that breaks the direction.
+8. Runtime boundaries are visible at the top of source files and enforced by the built-in ESLint `no-restricted-syntax` configuration in `tooling/eslint/boundaries.ts`: backend packages use `import "server-only";`, client UI uses `"use client";`, and shared `domain`/`validators` stay unmarked. App files declare their boundary; `"use server";` is only for Server Functions. Tests and type declarations are exempt. Use standard Node conditions and the marker package's own empty entry for backend tools/tests, not custom shims.
 
 ## On every structural change
 

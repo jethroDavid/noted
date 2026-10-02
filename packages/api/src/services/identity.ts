@@ -1,3 +1,4 @@
+import "server-only";
 import type { VerifiedIdentity } from "@noted/auth/src";
 import { db, homeInvitations, homeMemberships, users } from "@noted/db/src";
 import { and, eq, isNull, sql } from "drizzle-orm";

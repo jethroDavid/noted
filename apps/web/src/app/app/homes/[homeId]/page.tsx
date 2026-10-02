@@ -7,8 +7,18 @@ import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import { BoardView } from "../../../../features/board/board-view";
 import { MembersPanel } from "../../../../features/board/members-panel";
+import { BookView } from "../../../../features/book/book-view";
+import { ReelsView } from "../../../../features/tv/reels-view";
 import { useAuth } from "../../../../platform/auth/auth-provider";
 import { useTRPC } from "../../../../trpc/react";
+
+type HomeTab = "fridge" | "tv" | "book";
+
+const TABS: Array<{ id: HomeTab; label: string }> = [
+  { id: "fridge", label: "Fridge" },
+  { id: "tv", label: "TV" },
+  { id: "book", label: "Book" },
+];
 
 export default function HomeDetailPage({
   params,
@@ -20,6 +30,7 @@ export default function HomeDetailPage({
   const trpc = useTRPC();
   const router = useRouter();
   const [membersOpen, setMembersOpen] = useState(false);
+  const [tab, setTab] = useState<HomeTab>("fridge");
 
   const homeQuery = useQuery({
     ...trpc.homes.get.queryOptions({ homeId }),
@@ -51,15 +62,36 @@ export default function HomeDetailPage({
             {homeQuery.data?.home.name ?? "Home"}
           </h1>
         </div>
-        <Button
-          onClick={() => setMembersOpen((open) => !open)}
-          className="bg-white text-slate-900"
-        >
-          {membersOpen ? "Hide members" : "Members"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <nav aria-label="Home sections" className="flex gap-1">
+            {TABS.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => setTab(candidate.id)}
+                aria-current={tab === candidate.id ? "page" : undefined}
+                className={`rounded px-3 py-1.5 text-sm font-medium ${
+                  tab === candidate.id
+                    ? "bg-white text-slate-900"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                {candidate.label}
+              </button>
+            ))}
+          </nav>
+          <Button
+            onClick={() => setMembersOpen((open) => !open)}
+            className="bg-white text-slate-900"
+          >
+            {membersOpen ? "Hide members" : "Members"}
+          </Button>
+        </div>
       </header>
 
-      <BoardView homeId={homeId} />
+      {tab === "fridge" && <BoardView homeId={homeId} />}
+      {tab === "tv" && <ReelsView homeId={homeId} />}
+      {tab === "book" && <BookView homeId={homeId} />}
 
       {membersOpen && (
         <MembersPanel

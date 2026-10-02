@@ -40,12 +40,16 @@ CI mirrors the same five tasks. Nothing merges red.
 - `packages/db` — Drizzle schema, client, migrations.
 - `packages/domain` — shared domain rules (removal window, coordinates).
 - `packages/realtime` — Redis-backed realtime (room pub/sub, board cache, presence).
+- `packages/media` — S3 object storage plus image/video variants.
+- `packages/queue` — QStash publishers, job schemas, worker verification.
 - `packages/auth` — Firebase server seam (verify ID tokens) and env.
 - `packages/validators` — pure zod schemas shared by API and app.
 - `packages/ui` — shared visual components.
 - `tooling/*` — shared tsconfig, eslint, prettier, tailwind configs plus the CI setup action.
 
-Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` → `auth`/`db`/`domain`/`realtime`/`validators`, enforced by lint.
+Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` (+`queue` for worker routes) → `auth`/`db`/`domain`/`media`/`queue`/`realtime`/`validators`, enforced by lint.
+
+Source files declare their runtime boundary, enforced with ESLint's built-in `no-restricted-syntax`: backend packages start with `import "server-only";`, client UI modules start with `"use client";`, and shared `domain`/`validators` stay unmarked. App files declare either boundary; `"use server";` is reserved for Server Functions. Tests and type declarations are exempt. Node database tools use the standard `react-server` condition; Vitest aliases the marker to the package's own empty entry.
 
 ## Database workflow
 

@@ -1,7 +1,9 @@
 import base from "@noted/eslint-config/base";
+import { boundaryConfig } from "@noted/eslint-config/boundaries";
 
 export default [
   ...base,
+  boundaryConfig("server"),
   {
     rules: {
       "no-restricted-imports": [
@@ -18,6 +20,10 @@ export default [
                 "@noted/db/**",
                 "@noted/domain",
                 "@noted/domain/**",
+                "@noted/media",
+                "@noted/media/**",
+                "@noted/queue",
+                "@noted/queue/**",
                 "@noted/realtime",
                 "@noted/realtime/**",
                 "@noted/ui",

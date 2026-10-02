@@ -1,6 +1,6 @@
 "use client";
 
-import { BoardStage, Button } from "@noted/ui/src";
+import { BoardStage, Button, ConnectionPill } from "@noted/ui/src";
 import type { BoardPost, BoardViewer } from "@noted/validators/src";
 import {
   skipToken,
@@ -16,7 +16,7 @@ import { DeleteToasts } from "./delete-toast";
 import { PhotoPickerModal } from "./photo-picker-modal";
 import { PostCard } from "./post-card";
 import type { TextPost } from "./post-kinds";
-import { ConnectionPill, ViewersRow } from "./presence";
+import { ViewersRow } from "./presence";
 import { TextPostModal } from "./text-post-modal";
 
 type ModalState =
@@ -38,10 +38,12 @@ export function BoardView({ homeId }: { homeId: string }) {
 
   const homeQuery = useQuery(trpc.homes.get.queryOptions({ homeId }));
   const boardId = homeQuery.data?.home.boardId;
+
   const boardQueryOptions = trpc.boards.get.queryOptions({
     homeId,
     boardId: boardId ?? "00000000-0000-0000-0000-000000000000",
   });
+
   const boardQuery = useQuery({
     ...boardQueryOptions,
     enabled: !!boardId,
@@ -83,11 +85,11 @@ export function BoardView({ homeId }: { homeId: string }) {
 
   useEffect(() => {
     if (!boardId || subscription.status !== "pending") return;
-  
+
     const timer = setInterval(() => {
       refreshPresence.mutate({ homeId, boardId });
     }, PRESENCE_REFRESH_INTERVAL_MS);
-  
+
     return () => clearInterval(timer);
   }, [boardId, homeId, subscription.status, refreshPresence]);
 
@@ -97,6 +99,13 @@ export function BoardView({ homeId }: { homeId: string }) {
   const dismissToast = useCallback((postId: string) => {
     setDeletedPosts((posts) => posts.filter((post) => post.id !== postId));
   }, []);
+
+  // A failed photo submit reopens the picker with this draft intact so
+  // the user can retry as-is. Fresh opens clear it.
+  const [photoDraft, setPhotoDraft] = useState<{
+    file: File;
+    error: string;
+  } | null>(null);
 
   if (homeQuery.isLoading) {
     return <p className="p-8 text-center text-slate-600">Loading home…</p>;
@@ -128,7 +137,14 @@ export function BoardView({ homeId }: { homeId: string }) {
           <Button onClick={() => setModal({ mode: "text-create" })}>
             + Note
           </Button>
-          <Button onClick={() => setModal({ mode: "photo" })}>+ Photo</Button>
+          <Button
+            onClick={() => {
+              setPhotoDraft(null);
+              setModal({ mode: "photo" });
+            }}
+          >
+            + Photo
+          </Button>
         </div>
         <div className="absolute top-3 right-3 z-30 flex items-center gap-3">
           <ViewersRow
@@ -194,8 +210,15 @@ export function BoardView({ homeId }: { homeId: string }) {
           <PhotoPickerModal
             homeId={homeId}
             boardId={boardId}
+            boardQueryKey={boardQueryOptions.queryKey}
+            initialFile={photoDraft?.file}
+            initialError={photoDraft?.error}
             onClose={() => setModal(null)}
             onMutated={onMutated}
+            onUploadFailed={(file, message) => {
+              setPhotoDraft({ file, error: message });
+              setModal({ mode: "photo" });
+            }}
           />
         )}
       </BoardStage>

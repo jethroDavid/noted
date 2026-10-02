@@ -64,6 +64,11 @@ jobs:
           --health-retries 5
     env:
       REDIS_URL: redis://localhost:6379
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: noted-media
+      S3_ACCESS_KEY_ID: noted
+      S3_SECRET_ACCESS_KEY: notednoted
     steps:
       - uses: actions/checkout@v5
       - name: Setup
@@ -71,6 +76,20 @@ jobs:
       - name: Copy env
         shell: bash
         run: cp .env.example .env
+      # MinIO runs as a plain container (not a service): its image needs
+      # an explicit `server` command, which services cannot pass.
+      - name: Start MinIO
+        shell: bash
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=noted \
+            -e MINIO_ROOT_PASSWORD=notednoted \
+            minio/minio:latest server /data
+          for _ in $(seq 1 24); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 5
+          done
+          curl -sf http://localhost:9000/minio/health/live
       - name: Test
         run: pnpm test
 

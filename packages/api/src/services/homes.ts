@@ -1,3 +1,4 @@
+import "server-only";
 import {
   boards,
   db,
@@ -14,9 +15,9 @@ import type {
 } from "@noted/validators/src";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull } from "drizzle-orm";
+import { boardChanged, mediaChanged } from "./events";
 import type { CurrentUser } from "./identity";
 import { normalizeEmail } from "./identity";
-import { boardChanged } from "./posts";
 
 interface HomeRow {
   id: string;
@@ -57,7 +58,7 @@ function toInvitation(row: {
   return { id: row.id, email: row.targetEmail, createdAt: row.createdAt };
 }
 
-async function findMemberHome(
+export async function findMemberHome(
   userId: string,
   homeId: string,
 ): Promise<HomeRow | undefined> {
@@ -76,7 +77,7 @@ async function findMemberHome(
   return row;
 }
 
-async function requireMemberHome(
+export async function requireMemberHome(
   user: CurrentUser,
   homeId: string,
 ): Promise<HomeRow> {
@@ -318,8 +319,9 @@ export async function removeMember(
   if (!removed) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Member not found." });
   }
-  // Publish so the removed member's stream rechecks and ends at once.
+  // Publish so the removed member's streams recheck and end at once.
   await boardChanged(home.boardId);
+  await mediaChanged(home.id);
   return { userId: removed.userId };
 }
 
@@ -342,7 +344,8 @@ export async function leaveHome(
         eq(homeMemberships.userId, user.id),
       ),
     );
-  // Publish so the leaver's stream (and everyone else's views) settle.
+  // Publish so the leaver's streams (and everyone else's views) settle.
   await boardChanged(home.boardId);
+  await mediaChanged(home.id);
   return { homeId: home.id };
 }

@@ -1,3 +1,4 @@
+import "server-only";
 import { helloInput } from "@noted/validators/src";
 import { publicProcedure, router } from "../trpc";
 

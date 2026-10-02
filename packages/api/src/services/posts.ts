@@ -1,3 +1,4 @@
+import "server-only";
 import {
   boards,
   bookEntries,
@@ -7,15 +8,16 @@ import {
   mediaAssets,
   posts,
 } from "@noted/db/src";
-import { PHOTO_FIXTURES, photoFixtureStorageKey } from "@noted/domain/src";
+import { mediaDisplayStatus } from "@noted/domain/src";
+import { viewUrl } from "@noted/media/src";
+import { publishJob } from "@noted/queue/src";
 import {
-  refreshBoardPresence,
-  invalidateBoardCache,
   isBoardViewerLive,
   leaveBoardPresence,
   listBoardViewers,
   publishBoardEvent,
   readBoardCache,
+  refreshBoardPresence,
   subscribeToBoard,
   writeBoardCache,
 } from "@noted/realtime/src";
@@ -25,8 +27,8 @@ import type {
   BoardPostsResponse,
   BoardPresenceEvent,
   BoardViewer,
-  CreatePhotoPostInput,
   CreateTextPostInput,
+  CreateUploadedPhotoInput,
   RestoreAnyPostInput,
   RestorePhotoPostInput,
   RestorePostInput,
@@ -40,7 +42,9 @@ import {
 } from "@noted/validators/src";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, sql } from "drizzle-orm";
+import { boardChanged, mediaChanged } from "./events";
 import type { CurrentUser } from "./identity";
+import { deleteAssetIfOrphaned, requirePendingUpload } from "./media";
 
 const postColumns = {
   id: posts.id,
@@ -68,7 +72,9 @@ interface PostRow {
   positionY: number;
   createdAt: Date;
   updatedAt: Date;
+  state: string | null;
   storageKey: string | null;
+  thumbnailKey: string | null;
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -79,19 +85,48 @@ function assertNever(value: never): never {
   throw new Error(`Unhandled post kind: ${String(value)}`);
 }
 
-function toBoardPost(row: PostRow): BoardPost {
+async function toBoardPost(row: PostRow): Promise<BoardPost> {
   if (row.kind === "photo") {
-    if (!row.storageKey) {
+    if (!row.storageKey || !row.state) {
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Something went wrong. Please try again.",
       });
     }
+
+    const status = mediaDisplayStatus({
+      state: row.state,
+      storageKey: row.storageKey,
+      variantKey: row.thumbnailKey,
+    });
+    // Bundled keys serve from /public; uploads via fresh presigned GETs
+    // (the caller checked membership first). Non-ready uploads carry nulls
+    // and render a spinner until the worker's thumbnail lands.
+    if (status !== "ready") {
+      return {
+        id: row.id,
+        boardId: row.boardId,
+        kind: "photo",
+        status,
+        imageUrl: null,
+        thumbnailUrl: null,
+        x: row.positionX,
+        y: row.positionY,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      };
+    }
+
+    const imageUrl = await viewUrl(row.storageKey);
     return {
       id: row.id,
       boardId: row.boardId,
       kind: "photo",
-      imageUrl: `/${row.storageKey}`,
+      status,
+      imageUrl,
+      thumbnailUrl: row.thumbnailKey
+        ? await viewUrl(row.thumbnailKey)
+        : imageUrl,
       x: row.positionX,
       y: row.positionY,
       createdAt: row.createdAt,
@@ -119,7 +154,12 @@ function toBoardPost(row: PostRow): BoardPost {
 }
 
 function withMedia<T extends Record<string, unknown>>(columns: T) {
-  return { ...columns, storageKey: mediaAssets.storageKey };
+  return {
+    ...columns,
+    state: mediaAssets.state,
+    storageKey: mediaAssets.storageKey,
+    thumbnailKey: mediaAssets.thumbnailKey,
+  };
 }
 
 async function findBoardForMember(
@@ -220,7 +260,7 @@ export async function readBoard(
       homeId: board.homeId,
       postAdditions: board.postAdditions,
     },
-    posts: rows.map(toBoardPost),
+    posts: await Promise.all(rows.map(toBoardPost)),
     serverTime: new Date(),
   };
   await writeBoardCache(board.id, response);
@@ -258,55 +298,33 @@ export async function createTextPost(
       .returning(postColumns);
     if (!post) throw new Error("Post insert returned no row.");
     await bumpPostAdditions(transaction, board.id);
-    return toBoardPost({ ...post, storageKey: null });
+    return toBoardPost({
+      ...post,
+      state: null,
+      storageKey: null,
+      thumbnailKey: null,
+    });
   });
   await boardChanged(board.id);
   return created;
 }
 
-export async function createPhotoPost(
+// Instant attach: the post row is created against the still-pending asset
+// and subscribers see a spinner; the browser PUTs bytes in the background
+// and confirmUpload queues processing once they land.
+export async function createUploadedPhoto(
   user: CurrentUser,
   homeId: string,
   boardId: string,
-  input: CreatePhotoPostInput,
+  input: CreateUploadedPhotoInput,
 ): Promise<BoardPost> {
   const board = await requireBoard(user, homeId, boardId);
-  const fixture = PHOTO_FIXTURES.find(
-    (candidate) => candidate.key === input.fixture,
+  const asset = await requirePendingUpload(
+    board.homeId,
+    input.assetId,
+    "photo",
   );
-  if (!fixture) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Unknown photo fixture.",
-    });
-  }
-  const storageKey = photoFixtureStorageKey(fixture.key);
-  const created = await db.transaction(async (transaction) => {
-    // Fixture assets are per-home lazy rows; concurrent first uses converge.
-    await transaction
-      .insert(mediaAssets)
-      .values({
-        homeId: board.homeId,
-        kind: "photo",
-        state: "attached",
-        storageKey,
-        contentType: fixture.contentType,
-        byteSize: fixture.byteSize,
-        width: null,
-        height: null,
-      })
-      .onConflictDoNothing();
-    const [asset] = await transaction
-      .select({ id: mediaAssets.id, storageKey: mediaAssets.storageKey })
-      .from(mediaAssets)
-      .where(
-        and(
-          eq(mediaAssets.homeId, board.homeId),
-          eq(mediaAssets.storageKey, storageKey),
-        ),
-      )
-      .limit(1);
-    if (!asset) throw new Error("Fixture asset lookup returned no row.");
+  const row = await db.transaction(async (transaction) => {
     const [post] = await transaction
       .insert(posts)
       .values({
@@ -321,7 +339,13 @@ export async function createPhotoPost(
       .returning(postColumns);
     if (!post) throw new Error("Post insert returned no row.");
     await bumpPostAdditions(transaction, board.id);
-    return toBoardPost({ ...post, storageKey: asset.storageKey });
+    return post;
+  });
+  const created = await toBoardPost({
+    ...row,
+    state: asset.state,
+    storageKey: asset.storageKey,
+    thumbnailKey: asset.thumbnailKey,
   });
   await boardChanged(board.id);
   return created;
@@ -353,7 +377,12 @@ export async function editPostContent(
   if (!row) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
   }
-  const edited = toBoardPost({ ...row, storageKey: null });
+  const edited = await toBoardPost({
+    ...row,
+    state: null,
+    storageKey: null,
+    thumbnailKey: null,
+  });
   await boardChanged(edited.boardId);
   return edited;
 }
@@ -373,14 +402,21 @@ export async function movePost(
   if (!row) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
   }
-  const moved = toBoardPost({ ...row, storageKey: post.storageKey });
+  const moved = await toBoardPost({
+    ...row,
+    state: post.state,
+    storageKey: post.storageKey,
+    thumbnailKey: post.thumbnailKey,
+  });
   await boardChanged(moved.boardId);
   return moved;
 }
 
-// The single removal for every post kind: text notes are deleted, photos
-// are archived to the book store. The kind comes from the stored row, so
-// callers never branch on it; a new kind adds one case below.
+// The single removal for every post kind: text notes are deleted, ready
+// photos are archived to the book store, and never-ready photos (a failed
+// or abandoned upload) are deleted with their orphaned asset. The kind
+// comes from the stored row, so callers never branch on it; a new kind
+// adds one case below.
 export async function removePost(
   user: CurrentUser,
   homeId: string,
@@ -403,18 +439,48 @@ export async function removePost(
         });
       }
       const mediaAssetId = post.mediaAssetId;
-      await db.transaction(async (transaction) => {
+      // Readiness is re-read inside the transaction so a thumbnail landing
+      // mid-remove still archives instead of discarding the photo.
+      const outcome = await db.transaction(async (transaction) => {
         await transaction
           .delete(posts)
           .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)));
-        await transaction.insert(bookEntries).values({
-          homeId,
-          mediaAssetId,
-          archivedFromPostId: postId,
-          archivedByUserId: user.id,
-        });
+        const [asset] = await transaction
+          .select()
+          .from(mediaAssets)
+          .where(eq(mediaAssets.id, mediaAssetId))
+          .limit(1);
+        const status = asset
+          ? mediaDisplayStatus({
+              state: asset.state,
+              storageKey: asset.storageKey,
+              variantKey: asset.thumbnailKey,
+            })
+          : "uploading";
+        if (status === "ready") {
+          await transaction.insert(bookEntries).values({
+            homeId,
+            mediaAssetId,
+            archivedFromPostId: postId,
+            archivedByUserId: user.id,
+          });
+          return { archived: true as const, keys: [] as string[] };
+        }
+        const keys = await deleteAssetIfOrphaned(transaction, mediaAssetId);
+        return { archived: false as const, keys };
       });
       await boardChanged(post.boardId);
+      if (outcome.archived) {
+        // Archiving changes the book too: Book subscribers refetch.
+        await mediaChanged(homeId);
+      } else if (outcome.keys.length > 0) {
+        await publishJob({
+          job: "cleanup-media",
+          homeId,
+          assetId: mediaAssetId,
+          keys: outcome.keys,
+        });
+      }
       return { postId };
     }
   }
@@ -455,7 +521,12 @@ async function restorePost(
       .limit(1);
     if (!post) throw new Error("Restored post lookup returned no row.");
     if (inserted.length > 0) await bumpPostAdditions(transaction, board.id);
-    return toBoardPost({ ...post, storageKey: null });
+    return toBoardPost({
+      ...post,
+      state: null,
+      storageKey: null,
+      thumbnailKey: null,
+    });
   });
 }
 
@@ -475,10 +546,10 @@ async function restorePhotoPost(
       .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
       .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
       .limit(1);
-    if (existing) return toBoardPost(existing);
+    if (existing) return await toBoardPost(existing);
     // The archive wrote the image reference into the book store; only the
     // entry for this post is consumed, so sibling posts sharing the same
-    // fixture asset are unaffected.
+    // asset are unaffected.
     const [entry] = await transaction
       .select({ mediaAssetId: bookEntries.mediaAssetId })
       .from(bookEntries)
@@ -526,7 +597,7 @@ async function restorePhotoPost(
       .limit(1);
     if (!post) throw new Error("Restored post lookup returned no row.");
     if (inserted.length > 0) await bumpPostAdditions(transaction, board.id);
-    return toBoardPost(post);
+    return await toBoardPost(post);
   });
 }
 
@@ -548,21 +619,12 @@ export async function restoreAnyPost(
     case "photo": {
       const restored = await restorePhotoPost(user, homeId, boardId, input);
       await boardChanged(restored.boardId);
+      // Undo consumes the book entry: Book subscribers refetch.
+      await mediaChanged(homeId);
       return restored;
     }
   }
   return assertNever(input);
-}
-
-// Fan-out after every board mutation: invalidate first so subscribers'
-// refetches rebuild from fresh Postgres rows, then publish. Membership
-// changes reuse it so a revoked member's stream ends at once.
-export async function boardChanged(boardId: string): Promise<void> {
-  await invalidateBoardCache(boardId);
-  await publishBoardEvent(boardId, {
-    type: "board-changed",
-    boardId,
-  } satisfies BoardEvent);
 }
 
 async function publishPresence(boardId: string): Promise<void> {
@@ -609,7 +671,7 @@ export async function* watchBoard(
   await refreshBoardPresence(board.id, viewer);
 
   if (!alreadyLive) await publishPresence(board.id);
-  
+
   const queue: BoardEvent[] = [];
   let wake: (() => void) | null = null;
 

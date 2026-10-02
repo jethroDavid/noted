@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./base": "./base.ts",
+    "./boundaries": "./boundaries.ts",
     "./nextjs": "./nextjs.ts",
     "./react": "./react.ts"
   },

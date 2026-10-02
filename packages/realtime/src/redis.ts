@@ -1,3 +1,4 @@
+import "server-only";
 import { Redis } from "ioredis";
 
 // Local compose default: tests and dev work with zero config while compose

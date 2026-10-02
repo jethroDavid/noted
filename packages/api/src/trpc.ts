@@ -1,3 +1,4 @@
+import "server-only";
 import type { AuthErrorCode } from "@noted/auth/src";
 import { AuthError, verifyIdToken } from "@noted/auth/src";
 import { initTRPC, TRPCError } from "@trpc/server";

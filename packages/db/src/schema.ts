@@ -1,3 +1,4 @@
+import "server-only";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -14,10 +15,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const boardKind = pgEnum("board_kind", ["fridge"]);
-// Voice notes are out of the demo scope; photo uploads land in Phase 3,
-// while Phase 1 photo notes reference bundled fixtures.
+// Voice notes are out of the demo scope; photo notes reference uploads.
 export const postKind = pgEnum("post_kind", ["text", "photo"]);
-export const mediaKind = pgEnum("media_kind", ["photo"]);
+export const mediaKind = pgEnum("media_kind", ["photo", "video"]);
 export const mediaState = pgEnum("media_state", [
   "pending",
   "attached",
@@ -154,6 +154,10 @@ export const mediaAssets = pgTable(
     byteSize: integer("byte_size").notNull(),
     width: integer("width"),
     height: integer("height"),
+    // Worker-written variant keys (null until processed; bundled keys
+    // stay null — their originals serve every size).
+    thumbnailKey: text("thumbnail_key"),
+    posterKey: text("poster_key"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -216,8 +220,38 @@ export const posts = pgTable(
   ],
 );
 
+// The TV reels feed: one row per uploaded clip. Fixture reels are seeded;
+// uploads arrive through the presigned flow.
+export const reels = pgTable(
+  "reels",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    homeId: uuid("home_id")
+      .notNull()
+      .references(() => homes.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+    creatorUserId: uuid("creator_user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("reels_home_idx").on(table.homeId)],
+);
+
 // The photo-book store: images removed from the fridge archive here.
-// Phase 1 writes it; the book UI lands in Phase 3.
 export const bookEntries = pgTable(
   "book_entries",
   {

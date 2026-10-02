@@ -15,6 +15,7 @@
     "@noted/auth": "workspace:*",
     "@noted/db": "workspace:*",
     "@noted/domain": "workspace:*",
+    "@noted/queue": "workspace:*",
     "@noted/realtime": "workspace:*",
     "@noted/tailwind-config": "workspace:*",
     "@noted/ui": "workspace:*",
@@ -28,6 +29,7 @@
     "next": "^16.3.6",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
+    "server-only": "catalog:",
     "superjson": "^2.2.6",
     "zod": "catalog:"
   },

@@ -50,23 +50,10 @@ export const normalizedCoordinateSchema = z
   .max(1)
   .refine(Number.isFinite, "A board coordinate must be a finite number.");
 
-// Mirrors PHOTO_FIXTURES in @noted/domain; this package cannot import that
-// leaf sibling, so an api test guards that the two key lists stay in sync.
-export const photoFixtureKeySchema = z.enum([
-  "lake",
-  "living-room",
-  "moonlit-bedroom",
-]);
-
 export const createTextPostSchema = z.object({
   text: postTextSchema,
   foregroundColor: hexColorSchema,
   backgroundColor: hexColorSchema,
-  x: normalizedCoordinateSchema,
-  y: normalizedCoordinateSchema,
-});
-export const createPhotoPostSchema = z.object({
-  fixture: photoFixtureKeySchema,
   x: normalizedCoordinateSchema,
   y: normalizedCoordinateSchema,
 });
@@ -119,11 +106,26 @@ const textPostSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
 });
+// Display state for upload-backed media, derived server-side from the asset
+// row (see mediaDisplayStatus in @noted/domain): uploading (bytes not
+// confirmed) and processing (bytes confirmed, variant not written) render a
+// spinner with null URLs; ready serves viewable URLs.
+export const mediaDisplayStatusSchema = z.enum([
+  "uploading",
+  "processing",
+  "ready",
+]);
+
 const photoPostSchema = z.object({
   id: z.uuid(),
   boardId: z.uuid(),
   kind: z.literal("photo"),
-  imageUrl: z.string(),
+  status: mediaDisplayStatusSchema,
+  // Ready uploads serve the original plus a small variant; legacy bundled
+  // keys serve the original for both. Non-ready posts carry nulls and
+  // render a spinner.
+  imageUrl: z.string().nullable(),
+  thumbnailUrl: z.string().nullable(),
   x: z.number(),
   y: z.number(),
   createdAt: z.date(),
@@ -166,6 +168,100 @@ export const boardEventSchema = z.discriminatedUnion("type", [
   boardPresenceEventSchema,
 ]);
 
+// Upload rules (Phase 3): the single allowlist for presigned uploads.
+// packages/media mirrors the content types for key extensions (a leaf that
+// cannot import this sibling); drift throws loudly at upload time.
+export const UPLOAD_RULES = {
+  photo: {
+    contentTypes: ["image/jpeg", "image/png", "image/webp"],
+    maxBytes: 10 * 1024 * 1024,
+  },
+  video: {
+    contentTypes: ["video/mp4", "video/webm"],
+    maxBytes: 100 * 1024 * 1024,
+  },
+} as const;
+
+export const assetIdSchema = z.uuid();
+export const reelIdSchema = z.uuid();
+export const bookEntryIdSchema = z.uuid();
+
+export const requestUploadSchema = z
+  .object({
+    homeId: homeIdSchema,
+    kind: z.enum(["photo", "video"]),
+    contentType: z.string().min(1),
+    byteSize: z.number().int().positive(),
+  })
+  .superRefine((input, ctx) => {
+    const rules = UPLOAD_RULES[input.kind];
+    if (
+      !(rules.contentTypes as readonly string[]).includes(input.contentType)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["contentType"],
+        message: `Unsupported ${input.kind} content type: ${input.contentType}`,
+      });
+    }
+    if (input.byteSize > rules.maxBytes) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["byteSize"],
+        message: `${input.kind} uploads are capped at ${rules.maxBytes} bytes.`,
+      });
+    }
+  });
+
+export const uploadTicketSchema = z.object({
+  assetId: assetIdSchema,
+  uploadUrl: z.string().url(),
+});
+
+export const createUploadedPhotoSchema = z.object({
+  assetId: assetIdSchema,
+  x: normalizedCoordinateSchema,
+  y: normalizedCoordinateSchema,
+});
+
+export const createReelSchema = z.object({ assetId: assetIdSchema });
+
+// Sent after the browser's background PUT lands: flips a pending asset to
+// attached and queues variant processing. Idempotent under retry.
+export const confirmUploadSchema = z.object({ assetId: assetIdSchema });
+
+export const reelSchema = z.object({
+  id: reelIdSchema,
+  homeId: homeIdSchema,
+  status: mediaDisplayStatusSchema,
+  // Null until the reel is ready (poster written); non-ready reels render
+  // a spinner. Fixture reels are ready with the original and no poster.
+  videoUrl: z.string().min(1).nullable(),
+  posterUrl: z.string().min(1).nullable(),
+  createdAt: z.date(),
+});
+export const reelsResponseSchema = z.object({ reels: z.array(reelSchema) });
+
+export const bookEntrySchema = z.object({
+  id: bookEntryIdSchema,
+  thumbnailUrl: z.string().min(1),
+  imageUrl: z.string().min(1),
+  archivedAt: z.date(),
+});
+export const bookResponseSchema = z.object({
+  entries: z.array(bookEntrySchema),
+});
+
+// Home media events (Phase 3) are invalidation signals like board events:
+// TV and Book subscribers refetch on every one.
+export const mediaChangedEventSchema = z.object({
+  type: z.literal("media-changed"),
+  homeId: homeIdSchema,
+});
+export const mediaEventSchema = z.discriminatedUnion("type", [
+  mediaChangedEventSchema,
+]);
+
 export const meResponseSchema = z.object({
   user: z.object({
     id: z.uuid(),
@@ -188,10 +284,22 @@ export type BoardViewer = z.infer<typeof boardViewerSchema>;
 export type BoardEvent = z.infer<typeof boardEventSchema>;
 export type BoardPresenceEvent = z.infer<typeof boardPresenceEventSchema>;
 export type CreateTextPostInput = z.infer<typeof createTextPostSchema>;
-export type CreatePhotoPostInput = z.infer<typeof createPhotoPostSchema>;
 export type UpdatePostContentInput = z.infer<typeof updatePostContentSchema>;
 export type UpdatePostPositionInput = z.infer<typeof updatePostPositionSchema>;
 export type RestorePostInput = z.infer<typeof restorePostSchema>;
 export type RestorePhotoPostInput = z.infer<typeof restorePhotoPostSchema>;
 export type RestoreAnyPostInput = z.infer<typeof restoreAnyPostSchema>;
-export type PhotoFixtureKey = z.infer<typeof photoFixtureKeySchema>;
+export type UploadKind = keyof typeof UPLOAD_RULES;
+export type RequestUploadInput = z.infer<typeof requestUploadSchema>;
+export type UploadTicket = z.infer<typeof uploadTicketSchema>;
+export type CreateUploadedPhotoInput = z.infer<
+  typeof createUploadedPhotoSchema
+>;
+export type CreateReelInput = z.infer<typeof createReelSchema>;
+export type ConfirmUploadInput = z.infer<typeof confirmUploadSchema>;
+export type MediaDisplayStatus = z.infer<typeof mediaDisplayStatusSchema>;
+export type Reel = z.infer<typeof reelSchema>;
+export type ReelsResponse = z.infer<typeof reelsResponseSchema>;
+export type BookEntry = z.infer<typeof bookEntrySchema>;
+export type BookResponse = z.infer<typeof bookResponseSchema>;
+export type MediaEvent = z.infer<typeof mediaEventSchema>;

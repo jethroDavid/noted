@@ -1,3 +1,4 @@
+import "server-only";
 import type { Metadata } from "next";
 import { AuthProvider } from "../platform/auth/auth-provider";
 import { TRPCReactProvider } from "../trpc/react";

@@ -1,3 +1,6 @@
+"use client";
+
+import { Spinner } from "@noted/ui/src";
 import type { BoardPost, RestoreAnyPostInput } from "@noted/validators/src";
 
 export type TextPost = Extract<BoardPost, { kind: "text" }>;
@@ -103,10 +106,19 @@ function TextPostBody({ post }: { post: TextPost }) {
 }
 
 function PhotoPostBody({ post }: { post: PhotoPost }) {
+  if (post.status !== "ready" || !post.thumbnailUrl) {
+    return (
+      <div className="p-1.5">
+        <div className="flex aspect-square w-full items-center justify-center rounded-sm bg-slate-100">
+          <Spinner label="Uploading photo…" />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="p-1.5">
       <img
-        src={post.imageUrl}
+        src={post.thumbnailUrl}
         alt="Fridge note attachment"
         draggable={false}
         className="pointer-events-none w-full rounded-sm"

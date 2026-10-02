@@ -1,3 +1,4 @@
+import "server-only";
 import { appRouter, createContext } from "@noted/api/src";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 

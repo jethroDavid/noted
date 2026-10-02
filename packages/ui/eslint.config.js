@@ -1,7 +1,9 @@
+import { boundaryConfig } from "@noted/eslint-config/boundaries";
 import reactConfig from "@noted/eslint-config/react";
 
 export default [
   ...reactConfig,
+  boundaryConfig("client"),
   {
     rules: {
       "no-restricted-imports": [
@@ -18,6 +20,10 @@ export default [
                 "@noted/db/**",
                 "@noted/domain",
                 "@noted/domain/**",
+                "@noted/media",
+                "@noted/media/**",
+                "@noted/queue",
+                "@noted/queue/**",
                 "@noted/realtime",
                 "@noted/realtime/**",
                 "@noted/ui",

@@ -1,3 +1,5 @@
+"use client";
+
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import type { Auth } from "firebase/auth";

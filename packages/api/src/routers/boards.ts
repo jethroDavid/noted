@@ -1,10 +1,11 @@
+import "server-only";
 import {
   boardIdSchema,
   boardPostSchema,
   boardPostsResponseSchema,
   boardPresenceEventSchema,
-  createPhotoPostSchema,
   createTextPostSchema,
+  createUploadedPhotoSchema,
   homeIdSchema,
   postIdSchema,
   restoreAnyPostSchema,
@@ -13,12 +14,12 @@ import {
 } from "@noted/validators/src";
 import { z } from "zod";
 import {
-  refreshPresence,
-  createPhotoPost,
   createTextPost,
+  createUploadedPhoto,
   editPostContent,
   movePost,
   readBoard,
+  refreshPresence,
   removePost,
   restoreAnyPost,
   watchBoard,
@@ -49,12 +50,12 @@ export const boardsRouter = router({
       }),
     ),
 
-  createPhoto: protectedProcedure
-    .input(boardInput.extend(createPhotoPostSchema.shape))
+  createUploadedPhoto: protectedProcedure
+    .input(boardInput.extend(createUploadedPhotoSchema.shape))
     .output(boardPostSchema)
     .mutation(async ({ ctx, input }) =>
-      createPhotoPost(ctx.user, input.homeId, input.boardId, {
-        fixture: input.fixture,
+      createUploadedPhoto(ctx.user, input.homeId, input.boardId, {
+        assetId: input.assetId,
         x: input.x,
         y: input.y,
       }),

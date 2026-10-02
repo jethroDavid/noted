@@ -16,6 +16,7 @@ catalog:
   eslint: ^9.38.0
   firebase: ^12.19.0
   prettier: ^3.6.2
+  server-only: 0.0.1
   tailwindcss: ^4.1.16
   tsx: ^4.23.15
   typescript: ^5.9.3
@@ -31,3 +32,4 @@ catalogs:
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
+  - ffmpeg-static
