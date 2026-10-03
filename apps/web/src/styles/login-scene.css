@@ -1,0 +1,59 @@
+/* The shader paints a bounded, fluid memory; GSAP owns its motion. */
+.login-memory {
+  width: min(960px, 105vw);
+  height: min(560px, 64vw);
+  min-height: 340px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center;
+}
+.login-memory-fallback {
+  mask-image: radial-gradient(
+    ellipse at 50% 52%,
+    #000 0 30%,
+    #000b 48%,
+    #0004 62%,
+    transparent 76%
+  );
+  opacity: 0;
+  transition: opacity 1.2s ease-out;
+}
+.login-memory[data-memory-display="fallback"][data-fallback-ready="true"]
+  .login-memory-fallback {
+  opacity: 0.85;
+}
+.login-memory[data-memory-display="animated"] .login-memory-fallback {
+  visibility: hidden;
+}
+.login-memory-canvas {
+  opacity: 0;
+}
+.login-memory[data-memory-display="animated"] .login-memory-canvas {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-memory-fallback {
+    transition: none;
+  }
+}
+.login-invitation::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -55px -80px;
+  background: radial-gradient(
+    ellipse,
+    #f7f2e7fa 0 15%,
+    #f7f2e7d9 36%,
+    #f7f2e77d 56%,
+    transparent 73%
+  );
+  pointer-events: none;
+}
+@media (max-width: 639px) {
+  .login-memory {
+    width: 640px;
+    height: 390px;
+  }
+}

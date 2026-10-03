@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./src": "./src/index.ts"
+    "./src": "./src/index.ts",
+    "./memory-portal": "./src/memory-portal.tsx"
   },
   "scripts": {
     "format": "prettier --check . --ignore-path ../../.gitignore",
@@ -11,8 +12,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.8.1",
     "react": "catalog:react19",
-    "react-dom": "catalog:react19"
+    "react-dom": "catalog:react19",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@noted/eslint-config": "workspace:*",
@@ -21,6 +24,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
+    "@types/three": "^0.186.0",
     "typescript": "catalog:"
   },
   "prettier": "@noted/prettier-config"

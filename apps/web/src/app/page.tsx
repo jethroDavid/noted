@@ -1,47 +1,134 @@
 "use client";
 
-import { Button } from "@noted/ui/src";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useState } from "react";
+import { LoginScene } from "../features/login/login-scene";
 import { useAuth } from "../platform/auth/auth-provider";
+
+function GoogleMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285f4"
+        d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.98-4.32 2.98-7.36Z"
+      />
+      <path
+        fill="#34a853"
+        d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.06.96-3.38.96-2.61 0-4.82-1.76-5.61-4.12H3.05v2.59A10 10 0 0 0 12 22Z"
+      />
+      <path
+        fill="#fbbc05"
+        d="M6.39 13.92A6 6 0 0 1 6.08 12c0-.67.11-1.32.31-1.92V7.49H3.05A10 10 0 0 0 2 12c0 1.62.39 3.15 1.05 4.51l3.34-2.59Z"
+      />
+      <path
+        fill="#ea4335"
+        d="M12 5.96c1.47 0 2.79.51 3.82 1.51l2.86-2.87A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.95 5.49l3.34 2.59C7.18 7.72 9.39 5.96 12 5.96Z"
+      />
+    </svg>
+  );
+}
+
+function PaperButton() {
+  return (
+    <svg
+      viewBox="0 0 280 64"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible drop-shadow-[0_4px_2px_#70775325]"
+    >
+      <path
+        className="login-button-outline"
+        d="M14 7 C72 2 189 7 266 4 Q278 5 277 18 L275 45 Q274 56 261 56 C189 60 86 55 16 59 Q4 58 5 46 L6 19 Q4 9 14 7Z"
+        fill="#fffaf0"
+        stroke="#829070"
+        strokeWidth="1.3"
+      />
+      <path
+        d="M20 11 C92 7 192 12 262 9 M18 54 C92 51 184 57 259 52"
+        fill="none"
+        stroke="#b4bb98"
+        strokeWidth="0.7"
+        opacity="0.55"
+      />
+    </svg>
+  );
+}
 
 export default function HomePage() {
   const auth = useAuth();
   const router = useRouter();
+  const [signingIn, setSigningIn] = useState(false);
 
-  useEffect(() => {
-    if (auth.status === "signed-in") router.push("/app");
-  }, [auth.status, router]);
+  const openHomes = useCallback(() => router.replace("/app"), [router]);
+
+  async function signIn() {
+    setSigningIn(true);
+    try {
+      await auth.signIn();
+    } finally {
+      setSigningIn(false);
+    }
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-100 p-8 text-center">
-      <h1 className="text-3xl font-bold text-slate-900">Noted</h1>
-      <p className="max-w-md text-slate-600">
-        A shared family kitchen board — fridge notes, TV reels, and a photo book
-        that archives itself.
-      </p>
-
-      {auth.status === "unconfigured" && (
-        <p role="alert" className="max-w-md text-amber-700">
-          Firebase web configuration is missing. Fill in the
-          NEXT_PUBLIC_FIREBASE_* values in .env to enable Google sign-in.
+    <LoginScene entering={auth.status === "signed-in"} onEntered={openHomes}>
+      <div className="relative z-10 flex w-full flex-col items-center px-4">
+        <h2 className="login-copy text-[clamp(34px,5vw,44px)] leading-[1.2] tracking-[-0.04em]">
+          Come on in.
+        </h2>
+        <p
+          id={auth.status === "unconfigured" ? "login-unavailable" : undefined}
+          role={
+            auth.error
+              ? "alert"
+              : auth.status === "unconfigured"
+                ? "status"
+                : undefined
+          }
+          className="login-copy mt-2 max-w-[260px] text-[19px] leading-relaxed text-[#5b6850]"
+        >
+          {auth.error
+            ? "Sign-in failed. Please try again."
+            : auth.status === "unconfigured"
+              ? "Sign-in is unavailable for now."
+              : "Kamusta"}
         </p>
-      )}
-      {auth.status === "loading" && <p className="text-slate-600">Loading…</p>}
-      {auth.status === "signed-out" && (
-        <Button onClick={() => auth.signIn()}>Sign in with Google</Button>
-      )}
-      {auth.status === "signed-in" && (
-        <Link href="/app" className="text-slate-900 underline">
-          Open your homes →
-        </Link>
-      )}
-      {auth.error && (
-        <p role="alert" className="max-w-md text-red-600">
-          {auth.error}
-        </p>
-      )}
-    </main>
+        {auth.status === "signed-in" ? (
+          <Link
+            href="/app"
+            className="relative mt-6 inline-flex min-h-[60px] w-full max-w-[280px] items-center justify-center px-6 text-[19px] text-[#354b35] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d]"
+          >
+            <PaperButton />
+            <span className="relative">
+              Open your homes <span aria-hidden="true">→</span>
+            </span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={signIn}
+            disabled={auth.status !== "signed-out" || signingIn}
+            aria-describedby={
+              auth.status === "unconfigured" ? "login-unavailable" : undefined
+            }
+            aria-busy={signingIn || auth.status === "loading"}
+            className="login-google-button relative mt-6 inline-flex min-h-[60px] w-full max-w-[280px] -rotate-[0.7deg] cursor-pointer items-center justify-center gap-3 px-5 text-[18px] leading-none whitespace-nowrap text-[#354b35] focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] disabled:cursor-wait disabled:opacity-70 motion-reduce:rotate-0"
+          >
+            <PaperButton />
+            <span className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-[#d6ddc8]/70">
+              <GoogleMark />
+            </span>
+            <span className="relative pt-1">
+              {signingIn
+                ? "Opening Google…"
+                : auth.status === "loading"
+                  ? "Getting ready…"
+                  : "Continue with Google"}
+            </span>
+          </button>
+        )}
+      </div>
+    </LoginScene>
   );
 }
