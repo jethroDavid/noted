@@ -1,6 +1,7 @@
 "use client";
 
 export { BoardStage } from "./board-stage";
+export { clampBoardPostPosition } from "./board-position";
 export { Button } from "./button";
 export { ConnectionPill } from "./connection-pill";
 export { HomeSceneIcon } from "./home-scene-icon";

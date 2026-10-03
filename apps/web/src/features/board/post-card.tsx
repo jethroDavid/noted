@@ -1,27 +1,20 @@
 "use client";
 
-import { clampNormalizedCoordinate } from "@noted/domain/src";
+import { clampBoardPostPosition, PaperTexture } from "@noted/ui/src";
 import type { BoardPost, BoardPostsResponse } from "@noted/validators/src";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useTRPC } from "../../trpc/react";
-import {
-  asEditablePost,
-  POST_KIND_META,
-  PostBody,
-  postCardAriaLabel,
-  postCardColors,
-} from "./post-kinds";
-import type { TextPost } from "./post-kinds";
+import { PostBody, postCardAriaLabel, postCardColors } from "./post-kinds";
 
 interface PostCardProps {
   post: BoardPost;
   homeId: string;
   boardQueryKey: QueryKey;
   onMutated: () => void;
-  onDeleted: (post: BoardPost) => void;
-  onEdit: (post: TextPost) => void;
+  onOpen: (post: BoardPost) => void;
 }
 
 interface DragState {
@@ -30,6 +23,7 @@ interface DragState {
   originX: number;
   originY: number;
   moved: boolean;
+  target: { x: number; y: number };
 }
 
 interface BoardSnapshot {
@@ -41,20 +35,52 @@ export function PostCard({
   homeId,
   boardQueryKey,
   onMutated,
-  onDeleted,
-  onEdit,
+  onOpen,
 }: PostCardProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [preview, setPreview] = useState<{ x: number; y: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const drag = useRef<DragState | null>(null);
+  const suppressClick = useRef(false);
+  const card = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{
+    surface: { width: number; height: number };
+    card: { width: number; height: number };
+  } | null>(null);
+  useLayoutEffect(() => {
+    const element = card.current;
+    const surface = element?.offsetParent as HTMLElement | null;
+    if (!element || !surface) return;
+    const measure = () => {
+      const next = {
+        surface: { width: surface.clientWidth, height: surface.clientHeight },
+        card: { width: element.offsetWidth, height: element.offsetHeight },
+      };
+      setSize((previous) =>
+        previous &&
+        previous.surface.width === next.surface.width &&
+        previous.surface.height === next.surface.height &&
+        previous.card.width === next.card.width &&
+        previous.card.height === next.card.height
+          ? previous
+          : next,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
 
-  const editablePost = asEditablePost(post);
-  const kindMeta = POST_KIND_META[post.kind];
   const colors = postCardColors(post);
+  // Stable per post, so realtime snapshots do not shuffle the little magnets.
+  const magnetColors = ["#bf795f", "#829a7b", "#d1ad5f", "#789ca0"];
+  const magnetColor =
+    magnetColors[parseInt(post.id.slice(-2), 16) % magnetColors.length];
 
-  // Removal and moves apply instantly to the cached board and reconcile
+  // Moves apply instantly to the cached board and reconcile
   // with the server afterwards; failures roll back to the snapshot.
   // This stays synchronous on purpose: the cancel only marks in-flight
   // refetches as stale (their late answers are discarded), so awaiting it
@@ -77,14 +103,6 @@ export function PostCard({
     if (context?.previous) {
       queryClient.setQueryData(boardQueryKey, context.previous);
     }
-  }
-
-  function vanishPost(): BoardSnapshot {
-    const snapshot = snapshotBoard();
-    patchBoard((posts) =>
-      posts.filter((candidate) => candidate.id !== post.id),
-    );
-    return snapshot;
   }
 
   function reportError(
@@ -114,35 +132,40 @@ export function PostCard({
       onSettled: () => onMutated(),
     }),
   );
-  const remove = useMutation(
-    trpc.boards.removePost.mutationOptions({
-      onMutate: () => vanishPost(),
-      onSuccess: () => setError(null),
-      onError: (mutationError, _variables, context) =>
-        reportError(mutationError, context),
-      onSettled: () => onMutated(),
-    }),
-  );
-
-  const position = preview ?? { x: post.x, y: post.y };
+  const desiredPosition = preview ?? { x: post.x, y: post.y };
+  const position = size
+    ? clampBoardPostPosition(desiredPosition, size.surface, size.card)
+    : desiredPosition;
 
   return (
     <div
+      ref={card}
       data-no-scene-swipe
-      role={editablePost ? "button" : undefined}
-      tabIndex={editablePost ? 0 : undefined}
+      role="button"
+      tabIndex={0}
+      aria-haspopup="dialog"
       aria-label={postCardAriaLabel(post)}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
+        suppressClick.current = false;
         const surface = event.currentTarget.offsetParent as HTMLElement | null;
         if (!surface) return;
         event.currentTarget.setPointerCapture(event.pointerId);
+        const origin = clampBoardPostPosition(
+          position,
+          { width: surface.clientWidth, height: surface.clientHeight },
+          {
+            width: event.currentTarget.offsetWidth,
+            height: event.currentTarget.offsetHeight,
+          },
+        );
         drag.current = {
           startClientX: event.clientX,
           startClientY: event.clientY,
-          originX: post.x,
-          originY: post.y,
+          originX: origin.x,
+          originY: origin.y,
           moved: false,
+          target: origin,
         };
       }}
       onPointerMove={(event) => {
@@ -159,31 +182,55 @@ export function PostCard({
         ) {
           state.moved = true;
         }
-        setPreview({
-          x: clampNormalizedCoordinate(state.originX + dx),
-          y: clampNormalizedCoordinate(state.originY + dy),
-        });
+        if (!state.moved) return;
+        state.target = clampBoardPostPosition(
+          { x: state.originX + dx, y: state.originY + dy },
+          { width: surface.clientWidth, height: surface.clientHeight },
+          {
+            width: event.currentTarget.offsetWidth,
+            height: event.currentTarget.offsetHeight,
+          },
+        );
+        setPreview(state.target);
       }}
-      onPointerUp={(event) => {
+      onPointerUp={() => {
         const state = drag.current;
         drag.current = null;
-        const target = preview;
         setPreview(null);
         if (!state) return;
-        if (state.moved && target) {
-          move.mutate({ homeId, postId: post.id, x: target.x, y: target.y });
-        } else if (editablePost && event.button === 0) {
-          onEdit(editablePost);
+        suppressClick.current = state.moved;
+        if (state.moved) {
+          move.mutate({
+            homeId,
+            postId: post.id,
+            x: state.target.x,
+            y: state.target.y,
+          });
         }
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        suppressClick.current = true;
+        setPreview(null);
+      }}
+      onClick={(event) => {
+        if (suppressClick.current) {
+          suppressClick.current = false;
+          return;
+        }
+        event.currentTarget.focus();
+        onOpen(post);
       }}
       onKeyDown={(event) => {
-        if (editablePost && (event.key === "Enter" || event.key === " ")) {
+        if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onEdit(editablePost);
+          onOpen(post);
         }
       }}
-      className={`absolute w-[clamp(90px,26vw,160px)] touch-none rounded-[2px_5px_3px_4px] shadow-[2px_4px_6px_#394b3830] select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] ${
-        preview ? "z-20 cursor-grabbing" : "cursor-grab"
+      className={`absolute w-[clamp(90px,26vw,160px)] touch-none rounded-[2px_5px_3px_4px] transition-shadow duration-200 select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] motion-reduce:transition-none ${
+        preview
+          ? "z-20 cursor-grabbing shadow-[4px_9px_10px_#394b3840]"
+          : "cursor-grab shadow-[2px_4px_6px_#394b3830] hover:shadow-[3px_6px_8px_#394b3840]"
       }`}
       style={{
         left: `${position.x * 100}%`,
@@ -191,25 +238,18 @@ export function PostCard({
         transform: "translate(-50%, -50%)",
         backgroundColor: colors.backgroundColor,
         color: colors.color,
+        maxWidth: "calc(100% - 12px)",
+        visibility: size ? "visible" : "hidden",
       }}
     >
+      <PaperTexture />
       <PostBody post={post} />
 
-      <span className="absolute -top-2 -right-2 flex gap-1">
-        <button
-          type="button"
-          aria-label={kindMeta.removeAriaLabel}
-          title={kindMeta.removeTitle}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => {
-            onDeleted(post);
-            remove.mutate({ homeId, postId: post.id });
-          }}
-          className="flex size-7 cursor-pointer items-center justify-center rounded-full border border-[#829070]/40 bg-[#fffaf0] text-lg leading-none text-[#65705a] shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#42583d]"
-        >
-          x
-        </button>
-      </span>
+      <span
+        aria-hidden="true"
+        className="home-fridge-magnet pointer-events-none absolute -top-2 left-[43%] size-5 rounded-full"
+        style={{ "--magnet-color": magnetColor } as CSSProperties}
+      />
 
       {error && (
         <div

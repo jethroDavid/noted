@@ -4,7 +4,7 @@ import { Spinner } from "@noted/ui/src";
 import type { BoardPost, RestoreAnyPostInput } from "@noted/validators/src";
 
 export type TextPost = Extract<BoardPost, { kind: "text" }>;
-type PhotoPost = Extract<BoardPost, { kind: "photo" }>;
+export type PhotoPost = Extract<BoardPost, { kind: "photo" }>;
 
 // Every kind-specific UI fact lives in this module. A new kind adds one
 // record entry, one body component, and one case per switch below — each
@@ -13,14 +13,20 @@ type PhotoPost = Extract<BoardPost, { kind: "photo" }>;
 
 export interface PostKindMeta {
   removeAriaLabel: string;
-  removeTitle: string;
+  removeLabel: string;
+  removingLabel: string;
 }
 
 export const POST_KIND_META: Record<BoardPost["kind"], PostKindMeta> = {
-  text: { removeAriaLabel: "Delete note", removeTitle: "Delete" },
+  text: {
+    removeAriaLabel: "Delete note",
+    removeLabel: "Delete note",
+    removingLabel: "Deleting…",
+  },
   photo: {
     removeAriaLabel: "Archive photo to the book",
-    removeTitle: "Archive to the photo book",
+    removeLabel: "Archive to photobook",
+    removingLabel: "Archiving…",
   },
 };
 
@@ -28,12 +34,6 @@ export const POST_KIND_META: Record<BoardPost["kind"], PostKindMeta> = {
 // build until each switch handles it.
 function assertNever(value: never): never {
   throw new Error(`Unhandled post kind: ${String(value)}`);
-}
-
-// Only text notes open the editor today; a second editable kind widens the
-// return type here and PostCard keeps working unchanged.
-export function asEditablePost(post: BoardPost): TextPost | null {
-  return post.kind === "text" ? post : null;
 }
 
 export function postCardAriaLabel(post: BoardPost): string {
@@ -99,7 +99,7 @@ export function toRestoreInput(post: BoardPost): RestoreAnyPostInput {
 
 function TextPostBody({ post }: { post: TextPost }) {
   return (
-    <div className="max-h-56 overflow-hidden p-3 text-sm break-words whitespace-pre-wrap">
+    <div className="max-h-[min(224px,calc(100cqh_-_20px))] overflow-hidden p-3 pt-4 text-[15px] leading-snug break-words whitespace-pre-wrap">
       {post.text}
     </div>
   );
@@ -109,7 +109,7 @@ function PhotoPostBody({ post }: { post: PhotoPost }) {
   if (post.status !== "ready" || !post.thumbnailUrl) {
     return (
       <div className="p-1.5">
-        <div className="flex aspect-square w-full items-center justify-center rounded-sm bg-slate-100">
+        <div className="flex aspect-square max-h-[calc(100cqh_-_32px)] w-full items-center justify-center rounded-sm bg-slate-100">
           <Spinner label="Uploading photo…" />
         </div>
       </div>
@@ -121,7 +121,7 @@ function PhotoPostBody({ post }: { post: PhotoPost }) {
         src={post.thumbnailUrl}
         alt="Fridge note attachment"
         draggable={false}
-        className="pointer-events-none w-full rounded-sm"
+        className="pointer-events-none max-h-[calc(100cqh_-_32px)] w-full rounded-sm object-contain"
       />
     </div>
   );

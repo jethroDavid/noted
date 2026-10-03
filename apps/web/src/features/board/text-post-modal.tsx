@@ -5,6 +5,8 @@ import type { BoardPost } from "@noted/validators/src";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTRPC } from "../../trpc/react";
+import { PostRemovalAction } from "./post-removal-action";
+import type { PostRemovalProps } from "./post-removal-action";
 
 type TextPost = Extract<BoardPost, { kind: "text" }>;
 
@@ -29,6 +31,7 @@ interface TextPostModalProps {
   post: TextPost | null;
   onClose: () => void;
   onMutated: () => void;
+  removal?: PostRemovalProps;
 }
 
 export function TextPostModal({
@@ -37,6 +40,7 @@ export function TextPostModal({
   post,
   onClose,
   onMutated,
+  removal,
 }: TextPostModalProps) {
   const trpc = useTRPC();
   const [text, setText] = useState(post?.text ?? "");
@@ -67,13 +71,15 @@ export function TextPostModal({
     }),
   );
 
-  const pending = create.isPending || edit.isPending;
+  const saving = create.isPending || edit.isPending;
+  const pending = saving || removal?.pending;
 
   return (
     <Modal title={post ? "Edit note" : "New note"} onClose={onClose}>
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          if (pending) return;
           setError(null);
           if (post) {
             edit.mutate({
@@ -102,6 +108,7 @@ export function TextPostModal({
           <textarea
             data-autofocus
             value={text}
+            disabled={pending}
             onChange={(event) => setText(event.target.value)}
             required
             maxLength={2000}
@@ -117,6 +124,7 @@ export function TextPostModal({
               <button
                 key={color.value}
                 type="button"
+                disabled={pending}
                 title={color.name}
                 aria-label={`Paper ${color.name}`}
                 aria-pressed={backgroundColor === color.value}
@@ -139,6 +147,7 @@ export function TextPostModal({
               <button
                 key={color.value}
                 type="button"
+                disabled={pending}
                 title={color.name}
                 aria-label={`Ink ${color.name}`}
                 aria-pressed={foregroundColor === color.value}
@@ -160,13 +169,18 @@ export function TextPostModal({
           </p>
         )}
 
-        <div className="flex justify-end gap-2">
-          <Button type="button" onClick={onClose} variant="quiet">
-            Cancel
-          </Button>
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : post ? "Save" : "Stick it"}
-          </Button>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          {post && removal && (
+            <PostRemovalAction kind="text" disabled={saving} {...removal} />
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button type="button" onClick={onClose} variant="quiet">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {saving ? "Saving…" : post ? "Save" : "Stick it"}
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

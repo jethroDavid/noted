@@ -1,7 +1,11 @@
 "use client";
 
 import { BoardStage, Button, ConnectionPill } from "@noted/ui/src";
-import type { BoardPost, BoardViewer } from "@noted/validators/src";
+import type {
+  BoardPost,
+  BoardPostsResponse,
+  BoardViewer,
+} from "@noted/validators/src";
 import {
   skipToken,
   useMutation,
@@ -12,16 +16,19 @@ import { useSubscription } from "@trpc/tanstack-react-query";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../platform/auth/auth-provider";
 import { useTRPC } from "../../trpc/react";
+import { MemoryBackdrop } from "../motion/memory-backdrop";
 import { DeleteToasts } from "./delete-toast";
 import { PhotoPickerModal } from "./photo-picker-modal";
+import { PhotoPostModal } from "./photo-post-modal";
 import { PostCard } from "./post-card";
-import type { TextPost } from "./post-kinds";
+import type { PhotoPost, TextPost } from "./post-kinds";
 import { ViewersRow } from "./presence";
 import { TextPostModal } from "./text-post-modal";
 
 type ModalState =
   | { mode: "text-create" }
   | { mode: "text-edit"; post: TextPost }
+  | { mode: "photo-view"; post: PhotoPost }
   | { mode: "photo" }
   | null;
 
@@ -100,6 +107,70 @@ export function BoardView({ homeId }: { homeId: string }) {
     setDeletedPosts((posts) => posts.filter((post) => post.id !== postId));
   }, []);
 
+  // The controller stays mounted while a removed card disappears from the
+  // board, so failures can restore it and leave its dialog open for retry.
+  const remove = useMutation(
+    trpc.boards.removePost.mutationOptions({
+      onMutate: (target) => {
+        void queryClient.cancelQueries({
+          queryKey: boardQueryOptions.queryKey,
+        });
+        const previous = queryClient.getQueryData<BoardPostsResponse>(
+          boardQueryOptions.queryKey,
+        );
+        const post = previous?.posts.find(
+          (candidate) => candidate.id === target.postId,
+        );
+        queryClient.setQueryData<BoardPostsResponse>(
+          boardQueryOptions.queryKey,
+          (old) =>
+            old
+              ? {
+                  ...old,
+                  posts: old.posts.filter(
+                    (candidate) => candidate.id !== target.postId,
+                  ),
+                }
+              : old,
+        );
+        return { previous, post };
+      },
+      onSuccess: (_result, target, context) => {
+        if (context?.post) {
+          const deleted = context.post;
+          setDeletedPosts((posts) => [
+            ...posts.filter((post) => post.id !== deleted.id),
+            deleted,
+          ]);
+        }
+        setModal((current) =>
+          current && "post" in current && current.post.id === target.postId
+            ? null
+            : current,
+        );
+      },
+      onError: (_error, _target, context) => {
+        if (context?.previous)
+          queryClient.setQueryData(
+            boardQueryOptions.queryKey,
+            context.previous,
+          );
+      },
+      onSettled: onMutated,
+    }),
+  );
+  const removal = {
+    pending: remove.isPending,
+    error:
+      modal && "post" in modal && remove.variables?.postId === modal.post.id
+        ? (remove.error?.message ?? null)
+        : null,
+    onRemove: () => {
+      if (modal && "post" in modal && !remove.isPending)
+        remove.mutate({ homeId, postId: modal.post.id });
+    },
+  };
+
   // A failed photo submit reopens the picker with this draft intact so
   // the user can retry as-is. Fresh opens clear it.
   const [photoDraft, setPhotoDraft] = useState<{
@@ -132,8 +203,19 @@ export function BoardView({ homeId }: { homeId: string }) {
         onMutated={onMutated}
         onDismiss={dismissToast}
       />
-      <div className="absolute inset-x-1 bottom-1 z-30 mx-auto flex max-w-[660px] items-center justify-between gap-2">
-        <div className="flex gap-2">
+      <div className="absolute inset-x-3 top-2 z-30 mx-auto flex items-center justify-between gap-2 sm:inset-x-6">
+        <div className="flex items-center gap-3">
+          <ConnectionPill status={subscription.status} />
+          <div className="hidden sm:block">
+            <ViewersRow
+              viewers={viewers}
+              ownEmail={
+                auth.status === "signed-in" ? (auth.user.email ?? "") : ""
+              }
+            />
+          </div>
+        </div>
+        <div className="flex shrink-0 gap-2">
           <Button
             variant="quiet"
             className="rounded bg-[#fffaf0]/85 px-2 text-[15px]"
@@ -152,19 +234,16 @@ export function BoardView({ homeId }: { homeId: string }) {
             + Photo
           </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:block">
-            <ViewersRow
-              viewers={viewers}
-              ownEmail={
-                auth.status === "signed-in" ? (auth.user.email ?? "") : ""
-              }
-            />
-          </div>
-          <ConnectionPill status={subscription.status} />
-        </div>
       </div>
-      <BoardStage>
+      <BoardStage
+        surfaceSrc="/scene/sunday/fridge-cream.webp"
+        backdrop={
+          <MemoryBackdrop
+            imageSrc="/scene/sunday/fridge-kitchen-afternoon.webp"
+            mobileImageSrc="/scene/sunday/fridge-kitchen-afternoon-portrait.webp"
+          />
+        }
+      >
         {boardQuery.isLoading ? (
           <p
             role="status"
@@ -190,15 +269,14 @@ export function BoardView({ homeId }: { homeId: string }) {
               homeId={homeId}
               boardQueryKey={boardQueryOptions.queryKey}
               onMutated={onMutated}
-              onDeleted={(deleted) =>
-                setDeletedPosts((posts) => [
-                  ...posts.filter((post) => post.id !== deleted.id),
-                  deleted,
-                ])
-              }
-              onEdit={(textPost) =>
-                setModal({ mode: "text-edit", post: textPost })
-              }
+              onOpen={(post) => {
+                if (!remove.isPending) remove.reset();
+                setModal(
+                  post.kind === "text"
+                    ? { mode: "text-edit", post }
+                    : { mode: "photo-view", post },
+                );
+              }}
             />
           ))
         )}
@@ -217,8 +295,21 @@ export function BoardView({ homeId }: { homeId: string }) {
             homeId={homeId}
             boardId={boardId}
             post={modal.post}
+            removal={removal}
             onClose={() => setModal(null)}
             onMutated={onMutated}
+          />
+        )}
+        {modal?.mode === "photo-view" && (
+          <PhotoPostModal
+            post={
+              boardQuery.data?.posts.find(
+                (post): post is PhotoPost =>
+                  post.id === modal.post.id && post.kind === "photo",
+              ) ?? modal.post
+            }
+            removal={removal}
+            onClose={() => setModal(null)}
           />
         )}
         {modal?.mode === "photo" && (

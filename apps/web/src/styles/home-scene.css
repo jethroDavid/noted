@@ -8,6 +8,28 @@
     transparent 91%
   );
 }
+.home-fridge {
+  flex-shrink: 0;
+  filter: drop-shadow(5px 12px 9px #675a3438);
+}
+.home-fridge::before {
+  content: "";
+  position: absolute;
+  inset: auto -8% -3%;
+  height: 7%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #66553230, transparent 70%);
+  pointer-events: none;
+}
+.home-fridge-magnet {
+  background:
+    radial-gradient(circle at 32% 26%, #ffffffb0, transparent 40%),
+    var(--magnet-color, #829070);
+  border: 1px solid #394b3840;
+  box-shadow:
+    inset -2px -2px 1px #394b3830,
+    1px 3px 2px #394b3840;
+}
 .home-tv {
   aspect-ratio: 4 / 3;
   width: min(92%, calc((100svh - 160px) * 1.1));
