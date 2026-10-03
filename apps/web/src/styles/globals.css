@@ -1,2 +1,3 @@
 @import "@noted/tailwind-config/theme";
 @import "./login-scene.css";
+@import "./home-scene.css";

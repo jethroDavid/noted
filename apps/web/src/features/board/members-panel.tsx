@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@noted/ui/src";
+import { Button, Modal } from "@noted/ui/src";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "../../platform/auth/auth-provider";
@@ -62,190 +62,182 @@ export function MembersPanel({ homeId, onClose, onLeave }: MembersPanelProps) {
   const ownEmail = auth.status === "signed-in" ? (auth.user.email ?? "") : "";
 
   return (
-    <aside
-      aria-label="Home members"
-      className="fixed top-0 right-0 z-40 flex h-full w-80 flex-col gap-5 overflow-y-auto bg-white p-5 shadow-2xl"
-    >
-      <div className="flex items-start justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">Home</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close members panel"
-          className="rounded px-2 py-1 text-xl leading-none text-slate-500 hover:bg-slate-100"
-        >
-          x
-        </button>
-      </div>
+    <Modal title="Home members" placement="side" onClose={onClose}>
+      <div className="flex flex-col gap-6">
+        {detail.isLoading && <p className="text-[#65705a]">Loading…</p>}
+        {detail.error && (
+          <p role="alert" className="text-[#85513e]">
+            {detail.error.message}
+          </p>
+        )}
 
-      {detail.isLoading && <p className="text-slate-600">Loading…</p>}
-      {detail.error && (
-        <p role="alert" className="text-red-600">
-          {detail.error.message}
-        </p>
-      )}
-
-      {home && (
-        <>
-          {isCreator ? (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (nameDraft !== null && nameDraft.trim()) {
-                  rename.mutate({ homeId, name: nameDraft.trim() });
-                }
-              }}
-              className="flex flex-col gap-2"
-            >
-              <label className="text-sm text-slate-700">
-                Home name
-                <input
-                  value={nameDraft ?? home.name}
-                  onChange={(event) => setNameDraft(event.target.value)}
-                  maxLength={80}
-                  className="mt-1 w-full rounded border border-slate-300 p-2 text-slate-900"
-                />
-              </label>
-              <Button
-                type="submit"
-                disabled={rename.isPending || nameDraft === null}
-                className="self-start"
+        {home && (
+          <>
+            {isCreator ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (nameDraft !== null && nameDraft.trim()) {
+                    rename.mutate({ homeId, name: nameDraft.trim() });
+                  }
+                }}
+                className="flex flex-col gap-2"
               >
-                Rename
-              </Button>
-            </form>
-          ) : (
-            <p className="text-lg font-medium text-slate-900">{home.name}</p>
-          )}
-
-          <section>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">
-              Members
-            </h3>
-            <ul className="flex flex-col gap-2">
-              {home.members.map((member) => (
-                <li
-                  key={member.id}
-                  className="flex items-center justify-between gap-2 text-sm"
+                <label className="text-[17px] text-[#394b38]">
+                  Home name
+                  <input
+                    value={nameDraft ?? home.name}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    maxLength={80}
+                    className="mt-2 min-h-11 w-full rounded-[3px_7px_4px_6px] border border-[#829070]/40 bg-[#fffaf0] px-3 py-2 text-[19px] text-[#394b38] focus:outline-2 focus:outline-offset-2 focus:outline-[#829070]/50"
+                  />
+                </label>
+                <Button
+                  type="submit"
+                  disabled={rename.isPending || nameDraft === null}
+                  className="self-start"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate text-slate-900">
-                      {member.displayName ?? member.email}
-                      {member.email === ownEmail && (
-                        <span className="ml-1 text-slate-500">(you)</span>
+                  Rename
+                </Button>
+              </form>
+            ) : (
+              <p className="text-lg font-medium text-[#394b38]">{home.name}</p>
+            )}
+
+            <section>
+              <h3 className="mb-2 text-[17px] font-semibold text-[#394b38]">
+                Members
+              </h3>
+              <ul className="flex flex-col gap-2">
+                {home.members.map((member) => (
+                  <li
+                    key={member.id}
+                    className="flex items-center justify-between gap-2 text-[17px]"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-[#394b38]">
+                        {member.displayName ?? member.email}
+                        {member.email === ownEmail && (
+                          <span className="ml-1 text-[#65705a]">(you)</span>
+                        )}
+                      </span>
+                      {member.displayName && (
+                        <span className="block truncate text-[14px] text-[#65705a]">
+                          {member.email}
+                        </span>
                       )}
                     </span>
-                    {member.displayName && (
-                      <span className="block truncate text-xs text-slate-500">
-                        {member.email}
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-2">
-                    {member.isCreator && (
-                      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
-                        creator
-                      </span>
-                    )}
-                    {isCreator && !member.isCreator && (
-                      <button
-                        type="button"
-                        aria-label={`Remove ${member.email}`}
-                        onClick={() =>
-                          remove.mutate({ homeId, userId: member.id })
-                        }
-                        className="rounded px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {isCreator && (
-            <>
-              <section>
-                <h3 className="mb-2 text-sm font-semibold text-slate-700">
-                  Invite by email
-                </h3>
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    if (inviteEmail.trim()) {
-                      invite.mutate({ homeId, email: inviteEmail.trim() });
-                    }
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    type="email"
-                    required
-                    value={inviteEmail}
-                    onChange={(event) => setInviteEmail(event.target.value)}
-                    placeholder="family@example.com"
-                    className="min-w-0 flex-1 rounded border border-slate-300 p-2 text-sm text-slate-900"
-                  />
-                  <Button type="submit" disabled={invite.isPending}>
-                    Invite
-                  </Button>
-                </form>
-                <p className="mt-1 text-xs text-slate-500">
-                  They join automatically on their first Google sign-in.
-                </p>
-              </section>
-
-              {home.pendingInvitations.length > 0 && (
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">
-                    Pending invitations
-                  </h3>
-                  <ul className="flex flex-col gap-2">
-                    {home.pendingInvitations.map((invitation) => (
-                      <li
-                        key={invitation.id}
-                        className="flex items-center justify-between gap-2 text-sm text-slate-900"
-                      >
-                        <span className="truncate">{invitation.email}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {member.isCreator && (
+                        <span className="rounded bg-amber-100 px-2 py-0.5 text-[14px] text-amber-900">
+                          creator
+                        </span>
+                      )}
+                      {isCreator && !member.isCreator && (
                         <button
                           type="button"
+                          aria-label={`Remove ${member.email}`}
                           onClick={() =>
-                            revoke.mutate({
-                              homeId,
-                              invitationId: invitation.id,
-                            })
+                            remove.mutate({ homeId, userId: member.id })
                           }
-                          className="shrink-0 rounded px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+                          className="rounded px-2 py-0.5 text-[14px] text-[#85513e] hover:bg-[#ead5c6]"
                         >
-                          Revoke
+                          Remove
                         </button>
-                      </li>
-                    ))}
-                  </ul>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            {isCreator && (
+              <>
+                <section>
+                  <h3 className="mb-2 text-[17px] font-semibold text-[#394b38]">
+                    Invite by email
+                  </h3>
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (inviteEmail.trim()) {
+                        invite.mutate({ homeId, email: inviteEmail.trim() });
+                      }
+                    }}
+                    className="flex gap-2"
+                  >
+                    <input
+                      type="email"
+                      required
+                      value={inviteEmail}
+                      onChange={(event) => setInviteEmail(event.target.value)}
+                      placeholder="family@example.com"
+                      aria-label="Email address"
+                      className="min-h-11 min-w-0 flex-1 rounded-[3px_7px_4px_6px] border border-[#829070]/40 bg-[#fffaf0] p-2 text-[17px] text-[#394b38] focus:outline-2 focus:outline-offset-2 focus:outline-[#829070]/50"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={invite.isPending || !inviteEmail.trim()}
+                    >
+                      Invite
+                    </Button>
+                  </form>
+                  <p className="mt-1 text-[14px] text-[#65705a]">
+                    They join automatically on their first Google sign-in.
+                  </p>
                 </section>
-              )}
-            </>
-          )}
 
-          {!isCreator && (
-            <Button
-              onClick={() => leave.mutate({ homeId })}
-              disabled={leave.isPending}
-              className="self-start bg-red-600"
-            >
-              Leave home
-            </Button>
-          )}
+                {home.pendingInvitations.length > 0 && (
+                  <section>
+                    <h3 className="mb-2 text-[17px] font-semibold text-[#394b38]">
+                      Pending invitations
+                    </h3>
+                    <ul className="flex flex-col gap-2">
+                      {home.pendingInvitations.map((invitation) => (
+                        <li
+                          key={invitation.id}
+                          className="flex items-center justify-between gap-2 text-[17px] text-[#394b38]"
+                        >
+                          <span className="truncate">{invitation.email}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              revoke.mutate({
+                                homeId,
+                                invitationId: invitation.id,
+                              })
+                            }
+                            className="shrink-0 rounded px-2 py-0.5 text-[14px] text-[#85513e] hover:bg-[#ead5c6]"
+                          >
+                            Revoke
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </>
+            )}
 
-          {error && (
-            <p role="alert" className="text-sm text-red-600">
-              {error}
-            </p>
-          )}
-        </>
-      )}
-    </aside>
+            {!isCreator && (
+              <Button
+                onClick={() => leave.mutate({ homeId })}
+                disabled={leave.isPending}
+                variant="danger"
+                className="self-start"
+              >
+                Leave home
+              </Button>
+            )}
+
+            {error && (
+              <p role="alert" className="text-[17px] text-[#85513e]">
+                {error}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }

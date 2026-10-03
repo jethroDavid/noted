@@ -3,7 +3,7 @@
 import { Button, Modal } from "@noted/ui/src";
 import type { BoardPost } from "@noted/validators/src";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTRPC } from "../../trpc/react";
 
 type TextPost = Extract<BoardPost, { kind: "text" }>;
@@ -47,11 +47,6 @@ export function TextPostModal({
     post?.foregroundColor ?? INK_COLORS[0].value,
   );
   const [error, setError] = useState<string | null>(null);
-  const textAreaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    textAreaRef.current?.focus();
-  }, []);
 
   const create = useMutation(
     trpc.boards.createText.mutationOptions({
@@ -102,21 +97,21 @@ export function TextPostModal({
         }}
         className="flex flex-col gap-4"
       >
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-[17px] text-[#394b38]">
           Note
           <textarea
-            ref={textAreaRef}
+            data-autofocus
             value={text}
             onChange={(event) => setText(event.target.value)}
             required
             maxLength={2000}
             rows={5}
-            className="rounded border border-slate-300 p-2 text-slate-900"
+            className="rounded-[3px_7px_4px_6px] border border-[#829070]/40 bg-[#fffaf0] p-3 text-[19px] text-[#394b38] focus:outline-2 focus:outline-offset-2 focus:outline-[#829070]/50"
           />
         </label>
 
         <fieldset>
-          <legend className="text-sm text-slate-700">Paper</legend>
+          <legend className="text-[17px] text-[#394b38]">Paper</legend>
           <div className="mt-1 flex gap-2">
             {PAPER_COLORS.map((color) => (
               <button
@@ -128,7 +123,7 @@ export function TextPostModal({
                 onClick={() => setBackgroundColor(color.value)}
                 className={`h-8 w-8 rounded-full border-2 ${
                   backgroundColor === color.value
-                    ? "border-slate-900"
+                    ? "border-[#42583d]"
                     : "border-transparent"
                 }`}
                 style={{ backgroundColor: color.value }}
@@ -138,7 +133,7 @@ export function TextPostModal({
         </fieldset>
 
         <fieldset>
-          <legend className="text-sm text-slate-700">Ink</legend>
+          <legend className="text-[17px] text-[#394b38]">Ink</legend>
           <div className="mt-1 flex gap-2">
             {INK_COLORS.map((color) => (
               <button
@@ -150,7 +145,7 @@ export function TextPostModal({
                 onClick={() => setForegroundColor(color.value)}
                 className={`h-8 w-8 rounded-full border-2 ${
                   foregroundColor === color.value
-                    ? "border-slate-900"
+                    ? "border-[#42583d]"
                     : "border-transparent"
                 }`}
                 style={{ backgroundColor: color.value }}
@@ -160,17 +155,13 @@ export function TextPostModal({
         </fieldset>
 
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-[17px] text-[#85513e]">
             {error}
           </p>
         )}
 
         <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            onClick={onClose}
-            className="bg-slate-200 text-slate-900"
-          >
+          <Button type="button" onClick={onClose} variant="quiet">
             Cancel
           </Button>
           <Button type="submit" disabled={pending}>

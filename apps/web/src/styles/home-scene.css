@@ -1,0 +1,181 @@
+/* Object shading and soft memory edges; controls stay in Tailwind. */
+.home-room-memory {
+  mask-image: radial-gradient(
+    ellipse at 50% 52%,
+    #000 20%,
+    #000b 50%,
+    #0004 70%,
+    transparent 91%
+  );
+}
+.home-tv {
+  aspect-ratio: 4 / 3;
+  width: min(92%, calc((100svh - 160px) * 1.1));
+  flex-shrink: 0;
+  background: linear-gradient(
+    135deg,
+    #d9dbd2 0%,
+    #a7b0aa 34%,
+    #c7cec5 56%,
+    #919f94 100%
+  );
+  border: 2px solid #808e81;
+  border-radius: 5.5% 6.5% 7.5% 6.8%;
+  box-shadow:
+    inset 2px 3px 2px #f6f6eccc,
+    inset -4px -5px 1px #71816e80,
+    6px 17px 20px #53624630;
+}
+.home-tv-screen {
+  position: absolute;
+  top: 5%;
+  left: 5%;
+  width: 90%;
+  aspect-ratio: 3 / 2;
+  border: 0;
+  padding: 2%;
+  border-radius: 12% / 9%;
+  background: #48564b;
+  box-shadow:
+    0 1px 0 #e2e8db,
+    0 -3px 4px #596b5960,
+    inset 0 0 30px #0005;
+  overflow: hidden;
+}
+.home-tv-screen.home-tv-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100vw;
+  height: 100dvh;
+  aspect-ratio: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #14241d;
+}
+.home-tv-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, #fafaf01a, transparent 35%),
+    radial-gradient(ellipse, transparent 55%, #14251955);
+  box-shadow: inset 0 0 12px #10271780;
+}
+.home-tv-fizz {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background: repeating-linear-gradient(
+    0deg,
+    #d6ddcc 0 1px,
+    transparent 1px 3px
+  );
+  animation: home-tv-fizz 0.5s steps(2) infinite;
+}
+.home-tv-memory {
+  overflow: hidden;
+}
+.home-vhs-video {
+  filter: url("#home-vhs-color") saturate(0.82) contrast(1.08);
+}
+.home-vhs {
+  overflow: hidden;
+  box-shadow:
+    inset 1px 0 2px #e0636960,
+    inset -1px 0 2px #72cdbd60;
+}
+.home-vhs-tracking {
+  position: absolute;
+  inset: -15% 0;
+  opacity: 0.16;
+  background: linear-gradient(
+    transparent 44%,
+    #e4e4bd40 48%,
+    #13252370 50%,
+    transparent 53%
+  );
+  animation: home-vhs-tracking 8s linear infinite;
+}
+.home-vhs-tune {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    #c7d7bb80 0 1px,
+    transparent 1px 4px
+  );
+  animation: home-vhs-tune 0.32s ease-out both;
+}
+.home-tv-vents {
+  background: repeating-linear-gradient(
+    0deg,
+    #62736180 0 1px,
+    transparent 1px 4px
+  );
+  border-radius: 3px;
+}
+.home-album {
+  background: linear-gradient(
+    90deg,
+    #e2dfcf 0%,
+    #f8f1de 3%,
+    #fffaed 46%,
+    #dfd8c2 49.5%,
+    #bfb59b 50%,
+    #e8dfc8 51%,
+    #fffaed 55%,
+    #f7efdc 97%,
+    #d8d1bb 100%
+  );
+  border: 1px solid #c8c0a9;
+  border-radius: 10px 18px 18px 10px;
+  box-shadow:
+    0 5px 0 #d8d0b8,
+    0 9px 0 #ccc2a6,
+    4px 18px 22px #6c6c4f25;
+  transform-origin: 50% 50%;
+}
+@keyframes home-tv-fizz {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 3px;
+  }
+}
+@keyframes home-vhs-tracking {
+  from {
+    transform: translateY(-55%);
+  }
+  to {
+    transform: translateY(55%);
+  }
+}
+@keyframes home-vhs-tune {
+  0% {
+    opacity: 0.45;
+    transform: translateX(-3px);
+  }
+  35% {
+    opacity: 0.2;
+    transform: translateX(2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-tv-fizz,
+  .home-vhs-tracking {
+    animation: none;
+  }
+  .home-vhs-tune {
+    display: none;
+  }
+}

@@ -128,6 +128,7 @@ export function PostCard({
 
   return (
     <div
+      data-no-scene-swipe
       role={editablePost ? "button" : undefined}
       tabIndex={editablePost ? 0 : undefined}
       aria-label={postCardAriaLabel(post)}
@@ -181,7 +182,7 @@ export function PostCard({
           onEdit(editablePost);
         }
       }}
-      className={`absolute w-40 touch-none rounded shadow-lg select-none ${
+      className={`absolute w-[clamp(90px,26vw,160px)] touch-none rounded-[2px_5px_3px_4px] shadow-[2px_4px_6px_#394b3830] select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] ${
         preview ? "z-20 cursor-grabbing" : "cursor-grab"
       }`}
       style={{
@@ -204,7 +205,7 @@ export function PostCard({
             onDeleted(post);
             remove.mutate({ homeId, postId: post.id });
           }}
-          className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-sm leading-none text-white shadow"
+          className="flex size-7 cursor-pointer items-center justify-center rounded-full border border-[#829070]/40 bg-[#fffaf0] text-lg leading-none text-[#65705a] shadow focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#42583d]"
         >
           x
         </button>

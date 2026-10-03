@@ -82,7 +82,7 @@ function DeleteToastItem({
   const canUndo = post.kind === "text" || post.status === "ready";
 
   return (
-    <div className="flex items-center gap-3 rounded-full bg-slate-900 py-2 pr-2 pl-4 text-sm text-white shadow-xl">
+    <div className="flex max-w-[calc(100vw-32px)] items-center gap-3 rounded-[4px_10px_5px_8px] border border-[#829070]/30 bg-[#fffaf0] py-2 pr-2 pl-4 text-[17px] text-[#394b38] shadow-lg">
       <span className="max-w-64 truncate whitespace-nowrap">
         {failed ? "Couldn't undo — try again" : removedToastMessage(post)}
       </span>
@@ -93,7 +93,7 @@ function DeleteToastItem({
           onClick={() => {
             restore.mutate({ homeId, boardId, ...toRestoreInput(post) });
           }}
-          className="shrink-0 rounded-full bg-white px-3 py-1 font-semibold text-slate-900 disabled:opacity-60"
+          className="min-h-11 shrink-0 cursor-pointer px-3 py-1 text-[#42583d] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60"
         >
           {restore.isPending ? "Undoing…" : "Undo"}
         </button>

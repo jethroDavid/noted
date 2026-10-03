@@ -108,12 +108,12 @@ export function BoardView({ homeId }: { homeId: string }) {
   } | null>(null);
 
   if (homeQuery.isLoading) {
-    return <p className="p-8 text-center text-slate-600">Loading home…</p>;
+    return <p className="p-8 text-center text-[#65705a]">Loading home…</p>;
   }
   if (homeQuery.error || !boardId) {
     return (
       <div className="p-8 text-center">
-        <p role="alert" className="text-red-600">
+        <p role="alert" className="text-[#85513e]">
           {homeQuery.error?.message ?? "Home not found."}
         </p>
         <Button onClick={() => homeQuery.refetch()} className="mt-4">
@@ -124,7 +124,7 @@ export function BoardView({ homeId }: { homeId: string }) {
   }
 
   return (
-    <>
+    <div className="relative h-full min-h-0">
       <DeleteToasts
         homeId={homeId}
         boardId={boardId}
@@ -132,12 +132,18 @@ export function BoardView({ homeId }: { homeId: string }) {
         onMutated={onMutated}
         onDismiss={dismissToast}
       />
-      <BoardStage>
-        <div className="absolute top-3 left-3 z-30 flex gap-2">
-          <Button onClick={() => setModal({ mode: "text-create" })}>
+      <div className="absolute inset-x-1 bottom-1 z-30 mx-auto flex max-w-[660px] items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <Button
+            variant="quiet"
+            className="rounded bg-[#fffaf0]/85 px-2 text-[15px]"
+            onClick={() => setModal({ mode: "text-create" })}
+          >
             + Note
           </Button>
           <Button
+            variant="quiet"
+            className="rounded bg-[#fffaf0]/85 px-2 text-[15px]"
             onClick={() => {
               setPhotoDraft(null);
               setModal({ mode: "photo" });
@@ -146,23 +152,32 @@ export function BoardView({ homeId }: { homeId: string }) {
             + Photo
           </Button>
         </div>
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-3">
-          <ViewersRow
-            viewers={viewers}
-            ownEmail={
-              auth.status === "signed-in" ? (auth.user.email ?? "") : ""
-            }
-          />
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:block">
+            <ViewersRow
+              viewers={viewers}
+              ownEmail={
+                auth.status === "signed-in" ? (auth.user.email ?? "") : ""
+              }
+            />
+          </div>
           <ConnectionPill status={subscription.status} />
         </div>
-
+      </div>
+      <BoardStage>
         {boardQuery.isLoading ? (
-          <p className="absolute inset-0 flex items-center justify-center text-white">
+          <p
+            role="status"
+            className="absolute inset-0 flex items-center justify-center text-lg text-[#394b38]"
+          >
             Loading board…
           </p>
         ) : boardQuery.error ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <p role="alert" className="rounded bg-white px-4 py-2 text-red-600">
+            <p
+              role="alert"
+              className="rounded bg-white px-4 py-2 text-[#85513e]"
+            >
               {boardQuery.error.message}
             </p>
             <Button onClick={() => boardQuery.refetch()}>Retry</Button>
@@ -222,6 +237,6 @@ export function BoardView({ homeId }: { homeId: string }) {
           />
         )}
       </BoardStage>
-    </>
+    </div>
   );
 }

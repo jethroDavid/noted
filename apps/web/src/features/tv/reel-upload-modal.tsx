@@ -157,10 +157,10 @@ export function ReelUploadModal({
         {previewUrl ? (
           <div>
             {/* Uploads ship no caption tracks; captions are out of scope. */}
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
               src={previewUrl}
               controls
+              muted
               playsInline
               preload="metadata"
               className="max-h-72 w-full rounded-lg bg-black"
@@ -168,7 +168,7 @@ export function ReelUploadModal({
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
-              className="mt-2 text-sm font-medium text-slate-700 underline hover:text-slate-900"
+              className="mt-2 text-[17px] font-medium text-[#394b38] underline hover:text-[#394b38]"
             >
               Choose a different clip
             </button>
@@ -177,7 +177,7 @@ export function ReelUploadModal({
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="w-full rounded-lg border border-dashed border-slate-300 px-4 py-8 text-sm font-medium text-slate-700 hover:border-slate-900"
+            className="w-full rounded-lg border border-dashed border-[#829070]/40 px-4 py-8 text-[17px] font-medium text-[#394b38] hover:border-[#42583d]"
           >
             Choose a clip
           </button>
@@ -195,16 +195,12 @@ export function ReelUploadModal({
           }}
         />
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-[17px] text-[#85513e]">
             {error}
           </p>
         )}
         <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            onClick={onClose}
-            className="bg-slate-200 text-slate-900"
-          >
+          <Button type="button" onClick={onClose} variant="quiet">
             Cancel
           </Button>
           <Button type="submit" disabled={!file}>

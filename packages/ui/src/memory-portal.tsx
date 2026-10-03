@@ -16,6 +16,7 @@ export interface MemoryMotion {
 
 interface MemoryPortalProps {
   imageSrc: string;
+  variant?: "portal" | "room";
   motion: RefObject<MemoryMotion>;
   onReady: (render: (() => void) | null) => void;
   onUnavailable: () => void;
@@ -35,6 +36,8 @@ const fragmentShader = `
   uniform float uReveal;
   uniform float uPull;
   uniform float uAspect;
+  uniform float uImageAspect;
+  uniform float uRoom;
   uniform vec2 uPointer;
   varying vec2 vUv;
 
@@ -68,9 +71,9 @@ const fragmentShader = `
     warped.y += sin(q.x * 8.0 - t * 1.3) * 0.035 * memory;
     warped *= 1.0 + memory * sin(length(q) * 12.0 - t * 2.0) * 0.16;
     float zoom = 1.0 + 1.35 * pow(uPull, 1.4);
-    vec2 fit = vec2(min(uAspect / 1.5, 1.0), min(1.5 / uAspect, 1.0));
+    vec2 fit = vec2(min(uAspect / uImageAspect, 1.0), min(uImageAspect / uAspect, 1.0));
     vec2 imageUv = warped * fit / zoom + 0.5;
-    imageUv += liquid * (0.017 + 0.15 * memory);
+    imageUv += liquid * (0.017 + 0.009 * uRoom + 0.15 * memory);
     imageUv += uPointer * 0.012 * (1.0 - uPull);
     imageUv += q * dot(q, q) * 0.04 * (1.0 - uPull);
 
@@ -89,7 +92,7 @@ const fragmentShader = `
 
     float mist = flow(vUv * 4.4 + vec2(t * 0.7, -t * 0.4));
     float distance = length(q * vec2(1.0, 1.3));
-    float radius = mix(0.35, 0.88, uPull) * mix(0.55, 1.0, uReveal);
+    float radius = mix(mix(0.35, 0.63, uRoom), 0.88, uPull) * mix(0.55, 1.0, uReveal);
     float alpha = 1.0 - smoothstep(radius - 0.14, radius + 0.16,
       distance + (mist - 0.5) * (0.11 + memory * 0.28));
     float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
@@ -106,6 +109,7 @@ const fragmentShader = `
 
 function MemoryPlane({
   imageSrc,
+  variant = "portal",
   motion,
   onReady,
   onUnavailable,
@@ -127,9 +131,15 @@ function MemoryPlane({
       uReveal: { value: 0 },
       uPull: { value: 0 },
       uAspect: { value: 1.5 },
+      uImageAspect: {
+        value:
+          (texture.image as HTMLImageElement).width /
+          (texture.image as HTMLImageElement).height,
+      },
+      uRoom: { value: variant === "room" ? 1 : 0 },
       uPointer: { value: new Vector2() },
     }),
-    [texture],
+    [texture, variant],
   );
 
   useEffect(() => {

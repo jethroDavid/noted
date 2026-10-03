@@ -1,0 +1,20 @@
+# Sunday TV sala
+
+Built-in image generation, October 3, 2026. The login's `morning-memory.webp` was a style reference only. These are new compositions, not replacements for the login art. WebP encoding preserves the generated compositions.
+
+- `tv-sala-morning.webp`: landscape room, 1536×1024.
+- `tv-sala-morning-portrait.webp`: 1024×1536 portrait room composed for phones.
+
+Visual thesis: a soft, sunlit Filipino sala remembered from the floor on a school-free Sunday morning, with painted shapes and familiar everyday objects.
+
+Content plan: room details surround the foreground DOM television; the center remains quiet, with tiled floor and sunlight below. Existing clip controls remain the working surface.
+
+Interaction thesis: reveal only after the liquid renderer is ready; subtle currents move the room; vertical gestures wrap one finite clip list while horizontal gestures still switch scenes.
+
+## Landscape generation prompt
+
+Generate a NEW background illustration for the TV scene of a cozy family app. The supplied image is ONLY a style reference: preserve its hand-painted animation-background language, warm Philippine morning sunlight, brushy gouache shapes and fine pencil edges, muted cream, honey wood, dusty sage and pale blue-green tile palette. Do NOT copy its room arrangement or doorway. New scene: a modest early-2000s Filipino sala seen from a seated child's eye level facing the wall where a television would sit. On the left a broad window with simple iron window grills and sheer cream curtains, sunlight making broken geometric shadows across cool tiled floor. On the right a low wooden sofa with faded floral cushions, a woven basket, a small electric fan on a side stool, and a plain wall calendar with indistinct marks. A crocheted cream doily folded over the side table is a small memory detail. Soft distant adjoining dining nook with wood chairs links this room to a family kitchen. No people. Crucial composition: broad uncluttered center wall and open center foreground with no TV or furniture at the center, because the app overlays its own large CRT television there. Furniture and meaningful details belong around the outer sides/top, visible behind the central overlay. Landscape 3:2 artwork, visually strong when its central portion is cropped to portrait on a phone: keep window curtain and warm sun patches relatively close to central area. Calm Sunday morning, school-free, familiar, slightly dreamlike, imperfectly painted, charming and specific rather than polished corporate illustration. Rich authored scene with gentle texture and natural uneven shapes. No text, logos, watermarks, UI, borders, frames, CRT televisions, photorealistic render, or giant archway.
+
+## Portrait generation prompt
+
+Create a PORTRAIT 2:3 illustration of this same modest early-2000s Filipino sala for the phone version of a family app. This image is a scene/style reference. Recompose the room for a vertical canvas, NOT a cropped landscape. Same rich hand-painted animation background, gouache and fine pencil edges, soft cream walls, warm morning sunlight, pale blue-green ceramic tiled floor, honey wood, dusty sage. Window with decorative iron grills and sheer cream curtains should be prominent in the UPPER LEFT HALF of the portrait, the wooden sofa with faded floral cushions on the right middle edge, teal electric fan on a crocheted doily on a small side table on upper right, small wall calendar and plants. A distant dining nook is a subtle detail. Keep the middle band at about 40%-65% of image height relatively simple: the app overlays a wide television there, no television drawn into the artwork. Keep most recognizable room details ABOVE that band and tiled floor with sun shadows BELOW it, so the background tells the story around the TV. Composition feels like sitting on the floor on Sunday morning with no school. Beautiful specific memory, brush texture, slightly imperfect geometry, not photorealistic, not corporate. No people, no text, no logos, no UI, no frames, no TVs. Vertical portrait format, entire room thoughtfully recomposed within narrow width.

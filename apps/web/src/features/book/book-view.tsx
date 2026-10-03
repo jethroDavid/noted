@@ -1,13 +1,61 @@
 "use client";
 
-import { Button, ConnectionPill, Modal } from "@noted/ui/src";
+import { useGSAP } from "@gsap/react";
+import { Button, ConnectionPill, HomeSceneIcon, Modal } from "@noted/ui/src";
 import type { BookEntry } from "@noted/validators/src";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import gsap from "gsap";
+import type { ReactNode } from "react";
+import { useRef, useState } from "react";
 import { useTRPC } from "../../trpc/react";
 import { useMediaEvents } from "../media/use-media-events";
 
+gsap.registerPlugin(useGSAP);
+function AlbumSpread({
+  children,
+  direction,
+}: {
+  children: ReactNode;
+  direction: number;
+}) {
+  const root = useRef<HTMLDivElement>(null);
+  useGSAP(
+    () => {
+      const media = gsap.matchMedia();
+      media.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.fromTo(
+          root.current,
+          {
+            rotationY: direction * 18,
+            opacity: 0.4,
+            transformPerspective: 900,
+          },
+          {
+            rotationY: 0,
+            opacity: 1,
+            duration: 0.65,
+            ease: "power2.out",
+            clearProps: "transform",
+          },
+        );
+      });
+      return () => media.revert();
+    },
+    { scope: root },
+  );
+  return (
+    <div
+      ref={root}
+      className="home-album relative h-full min-h-0 px-4 py-6 sm:px-9 sm:py-8"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function BookView({ homeId }: { homeId: string }) {
+  const [page, setPage] = useState(0);
+  const [direction, setDirection] = useState(1);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const bookOptions = trpc.media.listBook.queryOptions({ homeId });
@@ -31,54 +79,130 @@ export function BookView({ homeId }: { homeId: string }) {
     }),
   );
 
+  const entries = bookQuery.data?.entries ?? [];
+  const pageCount = Math.max(1, Math.ceil(entries.length / 4));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleEntries = entries.slice(currentPage * 4, currentPage * 4 + 4);
+
   return (
     <section
       aria-label="Photo book"
-      className="mx-auto flex min-h-[60vh] w-full max-w-3xl flex-col gap-4 p-4"
+      className="relative mx-auto flex h-full w-full max-w-[1200px] flex-col"
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-300">
-          Photos removed from the fridge archive here.
-        </p>
+      <div className="absolute top-1 left-4 z-10 flex items-center gap-3">
+        <p className="sr-only">Photos saved from your fridge.</p>
         <ConnectionPill status={subscription.status} />
       </div>
-
       {error && (
-        <p role="alert" className="rounded bg-white px-4 py-2 text-red-600">
+        <p
+          role="alert"
+          className="absolute top-8 left-4 z-10 rounded bg-[#fffaf0] px-3 py-2 text-[#85513e]"
+        >
           {error}
         </p>
       )}
-
-      {bookQuery.isLoading ? (
-        <p className="py-8 text-center text-slate-300">Loading book…</p>
-      ) : bookQuery.error ? (
-        <div className="flex flex-col items-center gap-3 py-8">
-          <p role="alert" className="rounded bg-white px-4 py-2 text-red-600">
-            {bookQuery.error.message}
-          </p>
-          <Button onClick={() => bookQuery.refetch()}>Retry</Button>
-        </div>
-      ) : bookQuery.data && bookQuery.data.entries.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {bookQuery.data.entries.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              onClick={() => setViewing(entry)}
-              className="overflow-hidden rounded-lg bg-black shadow hover:ring-2 hover:ring-white"
+      <div className="min-h-0 flex-1 pt-1">
+        <AlbumSpread key={currentPage} direction={direction}>
+          {bookQuery.isLoading ? (
+            <p
+              role="status"
+              className="py-24 text-center text-lg text-[#65705a]"
             >
-              <img
-                src={entry.thumbnailUrl}
-                alt={`Archived ${entry.archivedAt.toLocaleDateString()}`}
-                className="aspect-square w-full object-cover"
+              Opening the photobook…
+            </p>
+          ) : bookQuery.error ? (
+            <div className="flex flex-col items-center gap-4 py-16 text-center">
+              <p role="alert" className="text-lg text-[#85513e]">
+                {bookQuery.error.message}
+              </p>
+              <Button onClick={() => void bookQuery.refetch()}>
+                Try again
+              </Button>
+            </div>
+          ) : entries.length > 0 ? (
+            <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-x-6 gap-y-4 sm:gap-x-16 sm:gap-y-6">
+              {visibleEntries.map((entry) => (
+                <button
+                  key={entry.id}
+                  data-scene-swipe
+                  type="button"
+                  onClick={() => setViewing(entry)}
+                  className="group flex min-h-0 min-w-0 cursor-pointer flex-col bg-[#fffdf6] p-2 pb-3 shadow-[1px_3px_5px_#645f4930] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d]"
+                >
+                  <img
+                    src={entry.thumbnailUrl}
+                    draggable={false}
+                    alt={`Archived ${entry.archivedAt.toLocaleDateString()}`}
+                    className="min-h-0 w-full flex-1 object-cover"
+                  />
+                  <span className="mt-2 block text-[13px] text-[#65705a] sm:text-[16px]">
+                    {entry.archivedAt.toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid h-full grid-cols-2 items-center gap-6 sm:gap-16">
+              <HomeSceneIcon
+                scene="book"
+                className="mx-auto w-full max-w-[130px] text-[#9b9f80]"
               />
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="py-8 text-center text-slate-300">
-          The book is empty — archived photos land here.
-        </p>
+              <div className="pr-1">
+                <h2 className="text-[25px] leading-tight sm:text-[31px]">
+                  A little space for memories.
+                </h2>
+                <p className="mt-3 text-[16px] leading-relaxed text-[#65705a] sm:text-[18px]">
+                  Photos archived from the fridge find a home here.
+                </p>
+              </div>
+            </div>
+          )}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute bottom-3 left-0 flex w-full justify-around text-[13px] text-[#a49c81]"
+          >
+            <span>{currentPage * 2 + 1}</span>
+            <span>{currentPage * 2 + 2}</span>
+          </div>
+        </AlbumSpread>
+      </div>
+      {entries.length > 4 && (
+        <nav
+          aria-label="Photobook pages"
+          className="flex h-11 shrink-0 items-center justify-center gap-3"
+        >
+          <Button
+            variant="quiet"
+            className="px-2"
+            disabled={currentPage === 0}
+            onClick={() => {
+              setDirection(-1);
+              setPage(currentPage - 1);
+            }}
+            aria-label="Previous photobook pages"
+          >
+            ←
+          </Button>
+          <p role="status" className="text-[16px] text-[#65705a]">
+            {currentPage + 1} / {pageCount}
+          </p>
+          <Button
+            variant="quiet"
+            className="px-2"
+            disabled={currentPage >= pageCount - 1}
+            onClick={() => {
+              setDirection(1);
+              setPage(currentPage + 1);
+            }}
+            aria-label="Next photobook pages"
+          >
+            →
+          </Button>
+        </nav>
       )}
 
       {viewing && (
@@ -93,7 +217,7 @@ export function BookView({ homeId }: { homeId: string }) {
               type="button"
               disabled={remove.isPending}
               onClick={() => remove.mutate({ homeId, entryId: viewing.id })}
-              className="rounded bg-red-600 px-4 py-2 text-white disabled:opacity-60"
+              className="min-h-11 cursor-pointer rounded-[4px_8px_3px_6px] bg-[#85513e] px-5 py-2 text-[17px] text-[#fffaf0] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#85513e] disabled:opacity-60"
             >
               {remove.isPending ? "Deleting…" : "Delete forever"}
             </button>
