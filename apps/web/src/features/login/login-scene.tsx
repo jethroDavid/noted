@@ -2,6 +2,7 @@
 
 import { useGSAP } from "@gsap/react";
 import type { MemoryMotion } from "@noted/ui/memory-portal";
+import { PaperTexture } from "@noted/ui/src";
 import gsap from "gsap";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -105,71 +106,6 @@ export function LoginScene({
             ease: "power3.out",
           });
           const surface = root.current;
-          const button = surface?.querySelector<HTMLButtonElement>(
-            ".login-google-button",
-          );
-          const paper = button?.querySelector(".login-button-outline");
-          const restOutline = paper?.getAttribute("d");
-          const floatButton = context.add("floatButton", () => {
-            if (!button || button.disabled) return;
-            gsap.to(button, {
-              y: -3,
-              rotation: 0.5,
-              scale: 1.025,
-              duration: 0.65,
-              ease: "elastic.out(1, 0.6)",
-              overwrite: "auto",
-            });
-            gsap.to(paper ?? [], {
-              attr: {
-                d: "M14 7 C72 10 189 0 266 4 Q278 5 277 18 L275 45 Q274 56 261 56 C189 52 86 63 16 59 Q4 58 5 46 L6 19 Q4 9 14 7Z",
-              },
-              duration: 0.75,
-              ease: "sine.inOut",
-              overwrite: "auto",
-            });
-          });
-          const settleButton = context.add("settleButton", () => {
-            gsap.to(button ?? [], {
-              y: 0,
-              rotation: -0.7,
-              scale: 1,
-              duration: 0.8,
-              ease: "elastic.out(1, 0.7)",
-              overwrite: "auto",
-            });
-            if (restOutline)
-              gsap.to(paper ?? [], {
-                attr: { d: restOutline },
-                duration: 0.8,
-                ease: "sine.inOut",
-                overwrite: "auto",
-              });
-          });
-          const pressButton = context.add("pressButton", () => {
-            if (button?.disabled) return;
-            gsap.to(button ?? [], {
-              y: 1,
-              scale: 0.975,
-              rotation: -0.3,
-              duration: 0.15,
-              overwrite: "auto",
-            });
-          });
-          const hoverButton = () => floatButton();
-          const leaveButton = () => settleButton();
-          const downButton = () => pressButton();
-          const buttonEvents = [
-            ["pointerenter", hoverButton],
-            ["pointerleave", leaveButton],
-            ["focus", hoverButton],
-            ["blur", leaveButton],
-            ["pointerdown", downButton],
-            ["pointerup", leaveButton],
-            ["pointercancel", leaveButton],
-          ] as const;
-          for (const [event, listener] of buttonEvents)
-            button?.addEventListener(event, listener);
           const move = (event: PointerEvent) => {
             if (event.pointerType !== "mouse" || !surface) return;
             const bounds = surface.getBoundingClientRect();
@@ -199,8 +135,6 @@ export function LoginScene({
             gsap.ticker.remove(tick);
             surface?.removeEventListener("pointermove", move);
             surface?.removeEventListener("pointerleave", leave);
-            for (const [event, listener] of buttonEvents)
-              button?.removeEventListener(event, listener);
           };
         },
       );
@@ -274,7 +208,12 @@ export function LoginScene({
               { autoAlpha: 0, scale: 0.94, duration: 0.65, ease: "power2.in" },
               0.12,
             )
-            .to(".login-wordmark", { autoAlpha: 0, duration: 0.55 }, 0.12);
+            .to(".login-wordmark", { autoAlpha: 0, duration: 0.55 }, 0.12)
+            .to(
+              ".login-memory",
+              { opacity: 0, duration: 0.65, ease: "sine.inOut" },
+              2.05,
+            );
         },
       );
       return () => media.revert();
@@ -292,21 +231,7 @@ export function LoginScene({
       aria-busy={entering}
       className="login-scene relative isolate flex min-h-svh flex-col items-center overflow-hidden bg-[#f7f2e7] px-5 pb-[max(3.5rem,env(safe-area-inset-bottom))] text-[#394b38] selection:bg-[#c8d3b4]"
     >
-      <svg
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.055] mix-blend-multiply"
-      >
-        <filter id="login-paper-grain">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.75"
-            numOctaves="3"
-            stitchTiles="stitch"
-          />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter="url(#login-paper-grain)" />
-      </svg>
+      <PaperTexture />
       <header className="login-wordmark relative z-10 mt-[max(2.5rem,env(safe-area-inset-top))] flex flex-col items-center text-center sm:mt-12">
         <div className="login-brand relative -rotate-2">
           <svg

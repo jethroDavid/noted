@@ -1,9 +1,11 @@
 "use client";
 
+import { PaperButtonArtwork } from "@noted/ui/src";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { LoginScene } from "../features/login/login-scene";
+import { usePaperMotion } from "../features/motion/use-paper-motion";
 import { useAuth } from "../platform/auth/auth-provider";
 
 function GoogleMark() {
@@ -29,36 +31,12 @@ function GoogleMark() {
   );
 }
 
-function PaperButton() {
-  return (
-    <svg
-      viewBox="0 0 280 64"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible drop-shadow-[0_4px_2px_#70775325]"
-    >
-      <path
-        className="login-button-outline"
-        d="M14 7 C72 2 189 7 266 4 Q278 5 277 18 L275 45 Q274 56 261 56 C189 60 86 55 16 59 Q4 58 5 46 L6 19 Q4 9 14 7Z"
-        fill="#fffaf0"
-        stroke="#829070"
-        strokeWidth="1.3"
-      />
-      <path
-        d="M20 11 C92 7 192 12 262 9 M18 54 C92 51 184 57 259 52"
-        fill="none"
-        stroke="#b4bb98"
-        strokeWidth="0.7"
-        opacity="0.55"
-      />
-    </svg>
-  );
-}
-
 export default function HomePage() {
   const auth = useAuth();
   const router = useRouter();
   const [signingIn, setSigningIn] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  usePaperMotion(button);
 
   const openHomes = useCallback(() => router.replace("/app"), [router]);
 
@@ -99,13 +77,14 @@ export default function HomePage() {
             href="/app"
             className="relative mt-6 inline-flex min-h-[60px] w-full max-w-[280px] items-center justify-center px-6 text-[19px] text-[#354b35] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d]"
           >
-            <PaperButton />
+            <PaperButtonArtwork />
             <span className="relative">
               Open your homes <span aria-hidden="true">→</span>
             </span>
           </Link>
         ) : (
           <button
+            ref={button}
             type="button"
             onClick={signIn}
             disabled={auth.status !== "signed-out" || signingIn}
@@ -113,9 +92,9 @@ export default function HomePage() {
               auth.status === "unconfigured" ? "login-unavailable" : undefined
             }
             aria-busy={signingIn || auth.status === "loading"}
-            className="login-google-button relative mt-6 inline-flex min-h-[60px] w-full max-w-[280px] -rotate-[0.7deg] cursor-pointer items-center justify-center gap-3 px-5 text-[18px] leading-none whitespace-nowrap text-[#354b35] focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] disabled:cursor-wait disabled:opacity-70 motion-reduce:rotate-0"
+            className="relative mt-6 inline-flex min-h-[60px] w-full max-w-[280px] -rotate-[0.7deg] cursor-pointer items-center justify-center gap-3 px-5 text-[18px] leading-none whitespace-nowrap text-[#354b35] focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] disabled:cursor-wait disabled:opacity-70 motion-reduce:rotate-0"
           >
-            <PaperButton />
+            <PaperButtonArtwork outlineClassName="paper-outline" />
             <span className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-white ring-1 ring-[#d6ddc8]/70">
               <GoogleMark />
             </span>

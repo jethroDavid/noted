@@ -25,7 +25,7 @@ At rest, a slowly moving noise field subtly distorts image coordinates and the s
 
 After successful authentication, the 2.7-second timeline removes the interface, widens the memory aperture, and draws the image toward the room's central passage. The inward zoom is smaller so liquid movement dominates: a shifting noise field, uneven rotation, crossing waves, and radial stretching bend the room's geometry. A faint displaced image echo and color separation make details overlap like a half-recalled memory. Liquid displacement strengthens during the pull while the edges dissolve unevenly. The user prefers this stranger, more pronounced distortion to a steady zoom. Timeline completion opens the existing homes page; there is no arbitrary redirect timer.
 
-The authenticated home UI is still the existing implementation. Continuity from this entrance into the three planned scenes is future scene work.
+During the final 0.65 seconds, the memory dissolves into the shared ivory paper. Timeline completion opens the homes chooser, whose content fades into that same surface. The three planned room scenes remain future scene work.
 
 ## Phone and accessibility behavior
 
