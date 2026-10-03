@@ -21,6 +21,33 @@
   background: radial-gradient(ellipse, #66553230, transparent 70%);
   pointer-events: none;
 }
+.home-fridge-note::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(175deg, #ffffff25, transparent 35%, #6655320c);
+  box-shadow:
+    inset 0 12px 12px -12px #66553245,
+    inset 0 -1px 0 #66553218;
+}
+.home-fridge-note::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 17px;
+  height: 17px;
+  border-bottom-right-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    transparent 48%,
+    #ffffff80 50%,
+    #66553230
+  );
+}
 .home-fridge-magnet {
   background:
     radial-gradient(circle at 32% 26%, #ffffffb0, transparent 40%),

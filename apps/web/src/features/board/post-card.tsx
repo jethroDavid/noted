@@ -227,7 +227,11 @@ export function PostCard({
           onOpen(post);
         }
       }}
-      className={`absolute w-[clamp(90px,26vw,160px)] touch-none rounded-[2px_5px_3px_4px] transition-shadow duration-200 select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] motion-reduce:transition-none ${
+      className={`absolute isolate touch-none rounded-[2px_5px_3px_4px] transition-shadow duration-200 select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] motion-reduce:transition-none ${
+        post.kind === "text"
+          ? "home-fridge-note w-[clamp(110px,28vw,180px)]"
+          : "w-[clamp(90px,26vw,160px)]"
+      } ${
         preview
           ? "z-20 cursor-grabbing shadow-[4px_9px_10px_#394b3840]"
           : "cursor-grab shadow-[2px_4px_6px_#394b3830] hover:shadow-[3px_6px_8px_#394b3840]"
@@ -247,7 +251,7 @@ export function PostCard({
 
       <span
         aria-hidden="true"
-        className="home-fridge-magnet pointer-events-none absolute -top-2 left-[43%] size-5 rounded-full"
+        className="home-fridge-magnet pointer-events-none absolute -top-2 left-[43%] z-20 size-5 rounded-full"
         style={{ "--magnet-color": magnetColor } as CSSProperties}
       />
 

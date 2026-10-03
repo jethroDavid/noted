@@ -15,7 +15,7 @@ export function PhotoPostModal({
   onClose: () => void;
 }) {
   return (
-    <Modal title="" onClose={onClose}>
+    <Modal title="Photo Post" onClose={onClose}>
       {post.status === "ready" && post.imageUrl ? (
         // Preserve the original upload's intrinsic ratio and signed URL.
         // eslint-disable-next-line @next/next/no-img-element

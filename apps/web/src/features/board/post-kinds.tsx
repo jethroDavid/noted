@@ -99,7 +99,7 @@ export function toRestoreInput(post: BoardPost): RestoreAnyPostInput {
 
 function TextPostBody({ post }: { post: TextPost }) {
   return (
-    <div className="max-h-[min(224px,calc(100cqh_-_20px))] overflow-hidden p-3 pt-4 text-[15px] leading-snug break-words whitespace-pre-wrap">
+    <div className="relative max-h-[min(224px,calc(100cqh_-_20px))] min-h-[min(96px,calc(100cqh_-_20px))] overflow-hidden px-3 pt-5 pb-5 text-[16px] leading-[1.45] break-words whitespace-pre-wrap sm:px-4 sm:text-[17px]">
       {post.text}
     </div>
   );

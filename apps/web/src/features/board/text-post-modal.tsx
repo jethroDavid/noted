@@ -113,13 +113,14 @@ export function TextPostModal({
             required
             maxLength={2000}
             rows={5}
-            className="rounded-[3px_7px_4px_6px] border border-[#829070]/40 bg-[#fffaf0] p-3 text-[19px] text-[#394b38] focus:outline-2 focus:outline-offset-2 focus:outline-[#829070]/50"
+            className="rounded-[3px_7px_4px_6px] border border-[#829070]/40 p-4 text-[19px] leading-relaxed shadow-[inset_0_12px_16px_-14px_#394b3840,1px_3px_5px_#394b3810] focus:outline-2 focus:outline-offset-2 focus:outline-[#829070]/50 disabled:opacity-60"
+            style={{ backgroundColor, color: foregroundColor }}
           />
         </label>
 
         <fieldset>
           <legend className="text-[17px] text-[#394b38]">Paper</legend>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {PAPER_COLORS.map((color) => (
               <button
                 key={color.value}
@@ -129,20 +130,24 @@ export function TextPostModal({
                 aria-label={`Paper ${color.name}`}
                 aria-pressed={backgroundColor === color.value}
                 onClick={() => setBackgroundColor(color.value)}
-                className={`h-8 w-8 rounded-full border-2 ${
+                className={`flex size-11 cursor-pointer items-center justify-center rounded-[3px_7px_4px_6px] border-2 text-xl text-[#33352e] shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#42583d] disabled:cursor-wait disabled:opacity-60 ${
                   backgroundColor === color.value
                     ? "border-[#42583d]"
-                    : "border-transparent"
+                    : "border-[#394b38]/15 hover:border-[#829070]"
                 }`}
                 style={{ backgroundColor: color.value }}
-              />
+              >
+                {backgroundColor === color.value && (
+                  <span aria-hidden="true">✓</span>
+                )}
+              </button>
             ))}
           </div>
         </fieldset>
 
         <fieldset>
           <legend className="text-[17px] text-[#394b38]">Ink</legend>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {INK_COLORS.map((color) => (
               <button
                 key={color.value}
@@ -152,13 +157,22 @@ export function TextPostModal({
                 aria-label={`Ink ${color.name}`}
                 aria-pressed={foregroundColor === color.value}
                 onClick={() => setForegroundColor(color.value)}
-                className={`h-8 w-8 rounded-full border-2 ${
+                className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-[3px_7px_4px_6px] border-2 bg-[#fffaf0] px-2 text-[15px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#42583d] disabled:cursor-wait disabled:opacity-60 ${
                   foregroundColor === color.value
-                    ? "border-[#42583d]"
-                    : "border-transparent"
+                    ? "border-[#42583d] shadow-sm"
+                    : "border-[#829070]/25 hover:border-[#829070]"
                 }`}
-                style={{ backgroundColor: color.value }}
-              />
+                style={{ color: color.value }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full text-sm text-[#fffaf0]"
+                  style={{ backgroundColor: color.value }}
+                >
+                  {foregroundColor === color.value ? "✓" : ""}
+                </span>
+                {color.name}
+              </button>
             ))}
           </div>
         </fieldset>
