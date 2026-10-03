@@ -142,25 +142,137 @@
   border-radius: 3px;
 }
 .home-album {
-  background: linear-gradient(
-    90deg,
-    #e2dfcf 0%,
-    #f8f1de 3%,
-    #fffaed 46%,
-    #dfd8c2 49.5%,
-    #bfb59b 50%,
-    #e8dfc8 51%,
-    #fffaed 55%,
-    #f7efdc 97%,
-    #d8d1bb 100%
-  );
-  border: 1px solid #c8c0a9;
-  border-radius: 10px 18px 18px 10px;
+  transform: perspective(1400px) rotateX(12deg) rotate(-1deg);
+  padding: 7px 6px 12px;
+  background:
+    radial-gradient(ellipse at 3% 5%, #d0c4a65e, transparent 26%),
+    radial-gradient(ellipse at 97% 95%, #c2b89a45, transparent 22%),
+    repeating-linear-gradient(90deg, #eee6ce1c 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, #17251f24 0 1px, transparent 1px 3px),
+    #687161;
+  border: 1px solid #6e705b;
+  border-radius: 2% 3% 3% 2%;
   box-shadow:
-    0 5px 0 #d8d0b8,
-    0 9px 0 #ccc2a6,
-    4px 18px 22px #6c6c4f25;
-  transform-origin: 50% 50%;
+    inset 1px 1px 2px #b6ac88,
+    0 2px 0 #c4b696,
+    0 4px 0 #8f8169,
+    0 6px 0 #cfbf9a,
+    0 9px 0 #5d675e,
+    8px 24px 22px #302d3a35;
+}
+.home-album-leaf {
+  background:
+    radial-gradient(ellipse at 0% 0%, #b68a4438, transparent 38%),
+    radial-gradient(ellipse at 100% 100%, #a8803e2b, transparent 34%),
+    radial-gradient(ellipse at 72% 20%, #fff8df90, transparent 60%),
+    radial-gradient(ellipse at 28% 70%, #c6ab7630, transparent 46%), #eee1c3;
+  backface-visibility: hidden;
+}
+.home-album-leaf > svg {
+  opacity: 0.18;
+}
+.home-album-leaf::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image: url("/scene/sunday/album-paper-fibers.svg");
+  mix-blend-mode: multiply;
+}
+.home-album-leaf-left {
+  border-radius: 2% 0 0 3%;
+  box-shadow:
+    inset -16px 0 20px -15px #705d49a0,
+    inset 2px 0 5px #b5976040,
+    inset 0 -3px 8px #b5976030;
+}
+.home-album-leaf-right {
+  border-radius: 0 3% 3% 0;
+  box-shadow:
+    inset 17px 0 21px -15px #705d4980,
+    inset -2px 0 6px #b5976060,
+    inset 0 -3px 8px #b5976030;
+}
+.home-album-turn {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+.home-album-turn-sheet {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.home-album-turn-strip {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+.home-album-turn-face {
+  position: absolute;
+  inset: 0 -1px 0 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0.2px);
+}
+.home-album-turn-back {
+  transform: rotateY(180deg) translateZ(0.2px);
+}
+.home-album-turn-shade {
+  position: absolute;
+  inset: 0;
+  background: #58422d;
+  opacity: 0;
+}
+.home-album-turn-shadow {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #36291b80, #36291b);
+  opacity: 0;
+}
+.home-album-photo::before,
+.home-album-photo::after {
+  content: "";
+  position: absolute;
+  width: 16%;
+  aspect-ratio: 1;
+  background: linear-gradient(
+    135deg,
+    #e2d5b8 48%,
+    #ae9b7740 49%,
+    transparent 52%
+  );
+  pointer-events: none;
+}
+.home-album-photo::before {
+  top: -2px;
+  left: -2px;
+}
+.home-album-photo::after {
+  right: -2px;
+  bottom: -2px;
+  rotate: 180deg;
+}
+.home-album-ribbon {
+  position: absolute;
+  z-index: -1;
+  top: 96%;
+  left: 50%;
+  width: clamp(20px, 4.2%, 30px);
+  height: 14%;
+  overflow: visible;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(-3deg);
+  transform-origin: 50% 0;
+  filter: drop-shadow(2px 3px 2px #302d3a35);
 }
 @keyframes home-tv-fizz {
   from {

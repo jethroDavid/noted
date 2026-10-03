@@ -1,61 +1,72 @@
 "use client";
 
-import { useGSAP } from "@gsap/react";
-import { Button, ConnectionPill, HomeSceneIcon, Modal } from "@noted/ui/src";
+import { Button, ConnectionPill, Modal, PaperTexture } from "@noted/ui/src";
 import type { BookEntry } from "@noted/validators/src";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import gsap from "gsap";
-import type { ReactNode } from "react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useTRPC } from "../../trpc/react";
 import { useMediaEvents } from "../media/use-media-events";
+import { MemoryBackdrop } from "../motion/memory-backdrop";
+import { useAlbumTurn } from "./use-album-turn";
 
-gsap.registerPlugin(useGSAP);
-function AlbumSpread({
-  children,
-  direction,
-}: {
-  children: ReactNode;
-  direction: number;
-}) {
-  const root = useRef<HTMLDivElement>(null);
-  useGSAP(
-    () => {
-      const media = gsap.matchMedia();
-      media.add("(prefers-reduced-motion: no-preference)", () => {
-        gsap.fromTo(
-          root.current,
-          {
-            rotationY: direction * 18,
-            opacity: 0.4,
-            transformPerspective: 900,
-          },
-          {
-            rotationY: 0,
-            opacity: 1,
-            duration: 0.65,
-            ease: "power2.out",
-            clearProps: "transform",
-          },
-        );
-      });
-      return () => media.revert();
-    },
-    { scope: root },
-  );
+function AlbumRibbon() {
+  const id = useId();
+  const outline =
+    "M4 0H24C22 24 20 44 23 62C26 81 28 95 24 110L4 107C8 91 7 78 5 62C2 43 5 22 4 0Z";
   return (
-    <div
-      ref={root}
-      className="home-album relative h-full min-h-0 px-4 py-6 sm:px-9 sm:py-8"
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 30 110"
+      preserveAspectRatio="none"
+      className="home-album-ribbon"
     >
-      {children}
-    </div>
+      <defs>
+        <linearGradient id={`${id}-cloth`} x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stopColor="#8d6759" />
+          <stop offset="0.35" stopColor="#bb9380" />
+          <stop offset="0.72" stopColor="#b58a77" />
+          <stop offset="1" stopColor="#926e60" />
+        </linearGradient>
+        <pattern
+          id={`${id}-weave`}
+          width="3"
+          height="3"
+          patternUnits="userSpaceOnUse"
+        >
+          <path
+            d="M0 0H3M0 0V3"
+            fill="none"
+            stroke="#ecd4b5"
+            strokeWidth="0.45"
+            opacity="0.24"
+          />
+        </pattern>
+      </defs>
+      <path d={outline} fill={`url(#${id}-cloth)`} />
+      <path d={outline} fill={`url(#${id}-weave)`} />
+      <path
+        d="M6 2C7 27 4 44 7 62C9 79 10 93 6 106M22 2C20 27 18 45 21 63C24 81 26 96 22 109"
+        fill="none"
+        stroke="#e2c6aa"
+        strokeWidth="0.6"
+        strokeDasharray="1.5 2.5"
+        opacity="0.5"
+      />
+      <path
+        d="M5 107L24 110"
+        fill="none"
+        stroke="#70594e"
+        strokeWidth="0.8"
+        opacity="0.45"
+      />
+    </svg>
   );
 }
 
 export function BookView({ homeId }: { homeId: string }) {
   const [page, setPage] = useState(0);
-  const [direction, setDirection] = useState(1);
+  const albumRoot = useRef<HTMLDivElement>(null);
+  const turnAlbum = useAlbumTurn(albumRoot, page);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const bookOptions = trpc.media.listBook.queryOptions({ homeId });
@@ -84,105 +95,166 @@ export function BookView({ homeId }: { homeId: string }) {
   const currentPage = Math.min(page, pageCount - 1);
   const visibleEntries = entries.slice(currentPage * 4, currentPage * 4 + 4);
 
+  const turnPage = (step: number) => {
+    const nextPage = currentPage + step;
+    if (nextPage < 0 || nextPage >= pageCount) return;
+    turnAlbum(step, () => setPage(nextPage));
+  };
+
   return (
     <section
       aria-label="Photo book"
-      className="relative mx-auto flex h-full w-full max-w-[1200px] flex-col"
+      className="relative isolate mx-auto h-full w-full"
     >
+      <MemoryBackdrop
+        imageSrc="/scene/sunday/book-bedroom-quiet-v2.webp"
+        mobileImageSrc="/scene/sunday/book-bedroom-quiet-portrait.webp"
+      />
       <div className="absolute top-1 left-4 z-10 flex items-center gap-3">
-        <p className="sr-only">Photos saved from your fridge.</p>
         <ConnectionPill status={subscription.status} />
-      </div>
-      {error && (
-        <p
-          role="alert"
-          className="absolute top-8 left-4 z-10 rounded bg-[#fffaf0] px-3 py-2 text-[#85513e]"
-        >
-          {error}
+        <p className="text-[14px] text-[#65705a] sm:text-[16px]">
+          {entries.length === 0
+            ? "Your photobook"
+            : `${entries.length} ${entries.length === 1 ? "memory" : "memories"}`}
         </p>
-      )}
-      <div className="min-h-0 flex-1 pt-1">
-        <AlbumSpread key={currentPage} direction={direction}>
-          {bookQuery.isLoading ? (
-            <p
-              role="status"
-              className="py-24 text-center text-lg text-[#65705a]"
-            >
-              Opening the photobook…
-            </p>
-          ) : bookQuery.error ? (
-            <div className="flex flex-col items-center gap-4 py-16 text-center">
-              <p role="alert" className="text-lg text-[#85513e]">
-                {bookQuery.error.message}
-              </p>
-              <Button onClick={() => void bookQuery.refetch()}>
-                Try again
-              </Button>
-            </div>
-          ) : entries.length > 0 ? (
-            <div className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-x-6 gap-y-4 sm:gap-x-16 sm:gap-y-6">
-              {visibleEntries.map((entry) => (
-                <button
-                  key={entry.id}
-                  data-scene-swipe
-                  type="button"
-                  onClick={() => setViewing(entry)}
-                  className="group flex min-h-0 min-w-0 cursor-pointer flex-col bg-[#fffdf6] p-2 pb-3 shadow-[1px_3px_5px_#645f4930] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d]"
-                >
-                  <img
-                    src={entry.thumbnailUrl}
-                    draggable={false}
-                    alt={`Archived ${entry.archivedAt.toLocaleDateString()}`}
-                    className="min-h-0 w-full flex-1 object-cover"
-                  />
-                  <span className="mt-2 block text-[13px] text-[#65705a] sm:text-[16px]">
-                    {entry.archivedAt.toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid h-full grid-cols-2 items-center gap-6 sm:gap-16">
-              <HomeSceneIcon
-                scene="book"
-                className="mx-auto w-full max-w-[130px] text-[#9b9f80]"
-              />
-              <div className="pr-1">
-                <h2 className="text-[25px] leading-tight sm:text-[31px]">
-                  A little space for memories.
-                </h2>
-                <p className="mt-3 text-[16px] leading-relaxed text-[#65705a] sm:text-[18px]">
-                  Photos archived from the fridge find a home here.
-                </p>
-              </div>
-            </div>
-          )}
+      </div>
+      <div className="flex h-full items-center justify-center pt-12 pb-5">
+        <div className="home-album relative aspect-[7/5] w-[min(93%,calc((100svh_-_220px)*1.2))] max-w-[820px] shrink-0 translate-y-[18%] sm:translate-y-[8%]">
           <div
-            aria-hidden="true"
-            className="pointer-events-none absolute bottom-3 left-0 flex w-full justify-around text-[13px] text-[#a49c81]"
+            ref={albumRoot}
+            className="relative grid h-full min-h-0 grid-cols-2 [perspective:1400px] [transform-style:preserve-3d]"
           >
-            <span>{currentPage * 2 + 1}</span>
-            <span>{currentPage * 2 + 2}</span>
+            {bookQuery.isLoading ? (
+              <p
+                role="status"
+                className="col-span-2 flex items-center justify-center text-lg text-[#65705a]"
+              >
+                Opening the photobook…
+              </p>
+            ) : bookQuery.error ? (
+              <div className="col-span-2 flex flex-col items-center justify-center gap-4 p-5 text-center">
+                <p role="alert" className="text-lg text-[#85513e]">
+                  {bookQuery.error.message}
+                </p>
+                <Button onClick={() => void bookQuery.refetch()}>
+                  Try again
+                </Button>
+              </div>
+            ) : entries.length > 0 ? (
+              ([0, 1] as const).map((side) => (
+                <div
+                  key={side}
+                  data-album-left={side === 0 || undefined}
+                  data-album-right={side === 1 || undefined}
+                  className={`home-album-leaf relative grid min-h-0 grid-rows-2 gap-3 px-[12%] pt-[12%] pb-[16%] sm:gap-5 ${side === 0 ? "home-album-leaf-left" : "home-album-leaf-right"}`}
+                >
+                  <PaperTexture />
+                  {visibleEntries
+                    .slice(side * 2, side * 2 + 2)
+                    .map((entry, index) => (
+                      <button
+                        key={entry.id}
+                        data-scene-swipe
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setViewing(entry);
+                        }}
+                        className={`home-album-photo relative flex min-h-0 min-w-0 cursor-pointer flex-col bg-[#f8f0dc] p-1.5 pb-2 shadow-[1px_3px_5px_#645f4930] transition-transform duration-300 hover:rotate-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] motion-reduce:transition-none sm:p-2 sm:pb-3 ${index === 0 ? "-rotate-2" : "rotate-1"}`}
+                      >
+                        <img
+                          src={entry.thumbnailUrl}
+                          draggable={false}
+                          alt={`Archived ${entry.archivedAt.toLocaleDateString()}`}
+                          className="min-h-0 w-full flex-1 bg-[#e9e3d6] object-contain"
+                        />
+                        <span className="mt-1 block text-[11px] text-[#65705a] sm:mt-2 sm:text-[15px]">
+                          {entry.archivedAt.toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
+                      </button>
+                    ))}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 bottom-[4%] text-center text-[12px] text-[#998c78] sm:text-[14px]"
+                  >
+                    {currentPage * 2 + side + 1}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <>
+                <div
+                  data-album-left
+                  className="home-album-leaf home-album-leaf-left relative flex flex-col items-center justify-center px-[12%] text-center"
+                >
+                  <PaperTexture />
+                  <span
+                    aria-hidden="true"
+                    className="mb-4 text-[24px] text-[#b29d7c] sm:mb-6 sm:text-[34px]"
+                  >
+                    ✧
+                  </span>
+                  <p className="-rotate-3 text-[22px] leading-snug text-[#7c786a] sm:text-[36px]">
+                    The little
+                    <br />
+                    things.
+                  </p>
+                  <span
+                    aria-hidden="true"
+                    className="mt-4 h-px w-10 bg-[#b29d7c]/40 sm:mt-6 sm:w-16"
+                  />
+                </div>
+                <div
+                  data-album-right
+                  className="home-album-leaf home-album-leaf-right relative flex flex-col justify-center px-[12%]"
+                >
+                  <PaperTexture />
+                  <h2 className="text-[20px] leading-tight sm:text-[31px]">
+                    A little space for memories.
+                  </h2>
+                  <p className="mt-3 text-[13px] leading-relaxed text-[#797968] sm:text-[18px]">
+                    Photos archived from the fridge find a home here.
+                  </p>
+                </div>
+              </>
+            )}
           </div>
-        </AlbumSpread>
+          <AlbumRibbon />
+          {pageCount > 1 &&
+            ([-1, 1] as const).map((step) => (
+              <button
+                key={step}
+                type="button"
+                aria-label={
+                  step === -1
+                    ? "Turn to previous photobook pages"
+                    : "Turn to next photobook pages"
+                }
+                disabled={
+                  step === -1
+                    ? currentPage === 0
+                    : currentPage === pageCount - 1
+                }
+                onClick={() => turnPage(step)}
+                className={`absolute inset-y-[5%] z-10 w-[calc(5%+22px)] cursor-pointer rounded transition-colors duration-200 hover:bg-[#8f7551]/10 focus-visible:bg-[#8f7551]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65705a] disabled:pointer-events-none motion-reduce:transition-none ${step === -1 ? "-left-[22px]" : "-right-[22px]"}`}
+              />
+            ))}
+        </div>
       </div>
       {entries.length > 4 && (
         <nav
           aria-label="Photobook pages"
-          className="flex h-11 shrink-0 items-center justify-center gap-3"
+          className="absolute top-0 right-3 z-10 flex h-11 items-center gap-1 rounded-[4px_8px_3px_6px] bg-[#fffaf0]/85 text-[#65705a] sm:right-4"
         >
           <Button
             variant="quiet"
             className="px-2"
             disabled={currentPage === 0}
-            onClick={() => {
-              setDirection(-1);
-              setPage(currentPage - 1);
-            }}
+            onClick={() => turnPage(-1)}
             aria-label="Previous photobook pages"
           >
             ←
@@ -194,10 +266,7 @@ export function BookView({ homeId }: { homeId: string }) {
             variant="quiet"
             className="px-2"
             disabled={currentPage >= pageCount - 1}
-            onClick={() => {
-              setDirection(1);
-              setPage(currentPage + 1);
-            }}
+            onClick={() => turnPage(1)}
             aria-label="Next photobook pages"
           >
             →
@@ -212,6 +281,11 @@ export function BookView({ homeId }: { homeId: string }) {
             alt="Archived entry at full size"
             className="max-h-[60vh] w-full rounded object-contain"
           />
+          {error && (
+            <p role="alert" className="mt-3 text-[#85513e]">
+              {error}
+            </p>
+          )}
           <div className="mt-4 flex justify-end">
             <button
               type="button"
