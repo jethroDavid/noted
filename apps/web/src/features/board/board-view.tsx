@@ -17,7 +17,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../platform/auth/auth-provider";
 import { useTRPC } from "../../trpc/react";
 import { MemoryBackdrop } from "../motion/memory-backdrop";
-import { useHomeSound } from "../sound/home-sound";
 import { DeleteToasts } from "./delete-toast";
 import { PhotoPickerModal } from "./photo-picker-modal";
 import { PhotoPostModal } from "./photo-post-modal";
@@ -40,7 +39,6 @@ const PRESENCE_REFRESH_INTERVAL_MS = 20_000;
 
 export function BoardView({ homeId }: { homeId: string }) {
   const entrance = useFridgeEntrance();
-  const sound = useHomeSound();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const auth = useAuth();
@@ -220,40 +218,6 @@ export function BoardView({ homeId }: { homeId: string }) {
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            data-home-sound-control
-            className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded bg-[#fffaf0]/85 text-[14px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] sm:w-auto sm:px-3"
-            aria-label={
-              sound.enabled ? "Turn home sound off" : "Turn home sound on"
-            }
-            aria-pressed={sound.enabled}
-            onClick={() => {
-              sound.unlock();
-              sound.setEnabled(!sound.enabled);
-            }}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="size-5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M11 5 6 9H3v6h3l5 4Z" />
-              {sound.enabled ? (
-                <path d="M15 8q4 4 0 8M18 5q7 7 0 14" />
-              ) : (
-                <path d="m16 9 5 6m0-6-5 6" />
-              )}
-            </svg>
-            <span className="hidden sm:inline">
-              {sound.enabled ? "Sound on" : "Sound off"}
-            </span>
-          </button>
           <Button
             variant="quiet"
             className="rounded bg-[#fffaf0]/85 px-2 text-[15px]"

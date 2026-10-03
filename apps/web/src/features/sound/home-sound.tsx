@@ -36,13 +36,9 @@ export function HomeSoundProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     const onGesture = (event: Event) => {
-      // Sound buttons unlock in their own click handler; unlocking on pointerdown
+      // The TV sound button unlocks in its click handler; unlocking on pointerdown
       // would change a "Tap for sound" toggle's state before its click arrives.
-      if (
-        (event.target as Element).closest?.(
-          "[data-tv-sound-control], [data-home-sound-control]",
-        )
-      )
+      if ((event.target as Element).closest?.("[data-tv-sound-control]"))
         return;
       if (event.isTrusted && enabled) unlock();
     };
