@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Component, useCallback, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { NotedLogo } from "../brand/noted-logo";
 
 gsap.registerPlugin(useGSAP);
 const artwork = "/scene/sunday/morning-memory.webp";
@@ -87,16 +88,6 @@ export function LoginScene({
             stagger: 0.12,
             ease: "power2.out",
           });
-          gsap.fromTo(
-            ".login-ink-draw",
-            { strokeDasharray: 1, strokeDashoffset: 1 },
-            {
-              strokeDashoffset: 0,
-              duration: 1.4,
-              stagger: 0.12,
-              ease: "power2.out",
-            },
-          );
           const x = gsap.quickTo(motion.current, "pointerX", {
             duration: 1.4,
             ease: "power3.out",
@@ -233,46 +224,12 @@ export function LoginScene({
     >
       <PaperTexture />
       <header className="login-wordmark relative z-10 mt-[max(2.5rem,env(safe-area-inset-top))] flex flex-col items-center text-center sm:mt-12">
-        <div className="login-brand relative -rotate-2">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 60 60"
-            className="absolute -top-1 -right-2 w-10 text-[#ba995b] sm:-right-12 sm:w-14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          >
-            <path
-              className="login-ink-draw"
-              pathLength="1"
-              d="M39 29 C40 39 31 44 23 39 C15 35 16 24 23 20 C32 14 41 22 39 29Z"
-            />
-            <path
-              className="login-ink-draw"
-              pathLength="1"
-              d="M28 9 L29 3 M43 14 L48 9 M47 29 L55 28 M43 42 L48 48 M28 47 L27 54 M14 43 L8 48 M10 29 L3 28 M14 15 L8 9"
-            />
-          </svg>
-          <h1 className="text-[clamp(5rem,10vw,7.5rem)] leading-[1.05] font-bold tracking-[-0.065em]">
-            noted<span className="text-[#7e9066]">.</span>
-          </h1>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 200 14"
-            className="-mt-1 ml-3 w-[85%] text-[#92a179]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-          >
-            <path
-              className="login-ink-draw"
-              pathLength="1"
-              d="M4 7 C54 3 122 10 194 4 M24 12 C66 9 122 12 161 9"
-            />
-          </svg>
-        </div>
+        <h1 className="login-brand -rotate-2">
+          <NotedLogo
+            className="h-auto w-[280px] max-w-full sm:w-[360px]"
+            sizes="(min-width: 640px) 360px, 280px"
+          />
+        </h1>
         <p className="login-copy mt-3 text-[18px] sm:text-[20px]">
           Make Yourself at Home
         </p>

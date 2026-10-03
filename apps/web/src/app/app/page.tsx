@@ -7,6 +7,7 @@ import gsap from "gsap";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
+import { NotedLogo } from "../../features/brand/noted-logo";
 import { usePaperMotion } from "../../features/motion/use-paper-motion";
 import { useAuth } from "../../platform/auth/auth-provider";
 import { useTRPC } from "../../trpc/react";
@@ -182,9 +183,12 @@ export default function HomesPage() {
           <Link
             href="/app"
             aria-label="Noted homes"
-            className="-rotate-2 text-[52px] leading-none font-bold tracking-[-0.065em] focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-[#42583d] sm:text-[60px]"
+            className="shrink-0 -rotate-2 focus-visible:outline-2 focus-visible:outline-offset-8 focus-visible:outline-[#42583d]"
           >
-            noted<span className="text-[#7e9066]">.</span>
+            <NotedLogo
+              className="h-auto w-[150px] sm:w-[220px]"
+              sizes="(min-width: 640px) 220px, 150px"
+            />
           </Link>
           {auth.status === "signed-in" && (
             <div className="flex max-w-full items-center gap-4 sm:gap-6">
