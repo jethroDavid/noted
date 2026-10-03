@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useHomeSound } from "../sound/home-sound";
 
 type Receiver = {
   context: AudioContext;
@@ -9,9 +10,8 @@ type Receiver = {
   hum: OscillatorNode;
 };
 
-// Created inside a TV interaction, never during autoplay.
-function createReceiver(): Receiver {
-  const context = new AudioContext();
+// The home supplies a gesture-unlocked context; only this scene owns these nodes.
+function createReceiver(context: AudioContext): Receiver {
   const gain = context.createGain();
   gain.gain.value = 0;
   gain.connect(context.destination);
@@ -39,62 +39,73 @@ function createReceiver(): Receiver {
   return { context, gain, hiss, hum };
 }
 
-export function useTvSound(playing: boolean, channel: string | null) {
+export function useTvSound(
+  playing: boolean,
+  channel: string | null,
+  idle: boolean,
+) {
+  const home = useHomeSound();
+  const { context } = home;
   const receiver = useRef<Receiver | null>(null);
-  const [enabled, setEnabled] = useState(true);
-  const [blocked, setBlocked] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const blocked = autoplayBlocked || (idle && home.enabled && !context);
+  const enabled = home.enabled && !blocked;
 
-  function startReceiver() {
+  useEffect(() => {
+    if (!context) return;
     try {
-      receiver.current ??= createReceiver();
-      setReady(true);
-      void receiver.current.context.resume().catch(() => setUnavailable(true));
+      receiver.current = createReceiver(context);
     } catch {
-      // Native clip audio remains available if Web Audio cannot start.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Report failure to initialize the external Web Audio receiver.
       setUnavailable(true);
     }
-  }
+    return () => {
+      const audio = receiver.current;
+      audio?.hiss.stop();
+      audio?.hum.stop();
+      audio?.gain.disconnect();
+      receiver.current = null;
+    };
+  }, [context]);
   function unlock() {
-    if (enabled || blocked) {
-      startReceiver();
-      setEnabled(true);
-      setBlocked(false);
+    if (home.enabled) {
+      home.unlock();
+      setAutoplayBlocked(false);
     }
   }
   function toggle() {
     if (enabled) {
-      setEnabled(false);
-      setBlocked(false);
+      home.setEnabled(false);
+      setAutoplayBlocked(false);
     } else {
-      startReceiver();
-      setEnabled(true);
-      setBlocked(false);
+      home.unlock();
+      home.setEnabled(true);
+      setAutoplayBlocked(false);
     }
   }
   const onAutoplayBlocked = useCallback(() => {
-    setEnabled(false);
-    setBlocked(true);
+    setAutoplayBlocked(true);
   }, []);
 
   useEffect(() => {
     const audio = receiver.current;
     if (!audio) return;
     const update = () => {
-      const audible =
-        enabled && playing && document.visibilityState === "visible";
+      const audible = home.enabled && document.visibilityState === "visible";
       const now = audio.context.currentTime;
       audio.gain.gain.cancelScheduledValues(now);
-      audio.gain.gain.setTargetAtTime(audible ? 0.014 : 0, now, 0.08);
-      if (audible)
-        void audio.context.resume().catch(() => setUnavailable(true));
-      else void audio.context.suspend();
+      // Empty channels have a barely audible buzz; paused clips stay quiet.
+      audio.gain.gain.setTargetAtTime(
+        audible ? (playing ? 0.014 : idle ? 0.003 : 0) : 0,
+        now,
+        0.18,
+      );
     };
     update();
     document.addEventListener("visibilitychange", update);
     return () => document.removeEventListener("visibilitychange", update);
-  }, [enabled, playing, ready]);
+  }, [home.enabled, playing, idle, context]);
 
   useEffect(() => {
     const audio = receiver.current;
@@ -110,17 +121,6 @@ export function useTvSound(playing: boolean, channel: string | null) {
     audio.gain.gain.setValueAtTime(0.04, now);
     audio.gain.gain.exponentialRampToValueAtTime(0.014, now + 0.18);
   }, [channel, enabled, playing]);
-
-  useEffect(
-    () => () => {
-      const audio = receiver.current;
-      audio?.hiss.stop();
-      audio?.hum.stop();
-      void audio?.context.close();
-      receiver.current = null;
-    },
-    [],
-  );
 
   return { enabled, blocked, unavailable, toggle, unlock, onAutoplayBlocked };
 }

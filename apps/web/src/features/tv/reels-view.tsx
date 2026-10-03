@@ -24,10 +24,6 @@ export function ReelsView({ homeId }: { homeId: string }) {
   const fullscreen = useTvFullscreen(screen);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
-  const sound = useTvSound(
-    playingId === activeId && activeId !== null,
-    activeId,
-  );
   function toggleSound() {
     const clip = viewport.current?.querySelector<HTMLVideoElement>(
       `[data-reel-id="${activeId}"] video`,
@@ -80,6 +76,12 @@ export function ReelsView({ homeId }: { homeId: string }) {
   );
 
   const reels = reelsQuery.data?.reels ?? [];
+  const activeReel = reels.find((reel) => reel.id === activeId) ?? reels[0];
+  const sound = useTvSound(
+    playingId === activeId && activeId !== null,
+    activeId,
+    activeReel?.status !== "ready" || !activeReel.videoUrl,
+  );
   const { scrollToClip, settle: settleWrap } = useReelWrapScroll(
     viewport,
     reels.length,

@@ -10,7 +10,20 @@
 }
 .home-fridge {
   flex-shrink: 0;
+  perspective: 1400px;
   filter: drop-shadow(5px 12px 9px #675a3438);
+}
+.home-fridge-door {
+  transform-origin: 2.9% 50%;
+  transform: rotateY(-38deg);
+}
+.home-fridge[data-fridge-closed="true"] .home-fridge-door {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-fridge-door {
+    transform: none;
+  }
 }
 .home-fridge::before {
   content: "";

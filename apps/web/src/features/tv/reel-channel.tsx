@@ -139,7 +139,7 @@ export function ReelChannel({
             loop={singleClip}
             playsInline
             preload="metadata"
-            onPlay={() => {
+            onPlaying={() => {
               setPlaying(true);
               onPlayback(reel.id, true);
             }}

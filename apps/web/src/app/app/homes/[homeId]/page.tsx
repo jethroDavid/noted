@@ -16,6 +16,7 @@ import { use, useRef, useState } from "react";
 import { BoardView } from "../../../../features/board/board-view";
 import { MembersPanel } from "../../../../features/board/members-panel";
 import { BookView } from "../../../../features/book/book-view";
+import { HomeSoundProvider } from "../../../../features/sound/home-sound";
 import { ReelsView } from "../../../../features/tv/reels-view";
 import { useAuth } from "../../../../platform/auth/auth-provider";
 import { useTRPC } from "../../../../trpc/react";
@@ -67,6 +68,18 @@ function SceneEntrance({
 }
 
 export default function HomeDetailPage({
+  params,
+}: {
+  params: Promise<{ homeId: string }>;
+}) {
+  return (
+    <HomeSoundProvider>
+      <HomeDetailContent params={params} />
+    </HomeSoundProvider>
+  );
+}
+
+function HomeDetailContent({
   params,
 }: {
   params: Promise<{ homeId: string }>;
