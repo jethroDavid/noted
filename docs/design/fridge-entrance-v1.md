@@ -2,7 +2,13 @@
 
 The cream appliance keeps its original closed appearance. An SVG aperture removes only the face from the original image, leaving a fixed outer casing. The same aperture clips the generated interior and hinged face, so the interior remains stationary and the opaque face naturally covers it when closing. There is no fade or artwork swap at closure. The face carries the notes and magnets; both doors close together over 1.15 seconds, once per scene entry. Board refreshes do not restart it. Reduced motion, image failure, hiding the tab, resizing, or leaving the scene settle the appliance without replay.
 
-The web shell synthesizes a short low seal thump and three damped glass resonances at closure. Bottle peaks are more than ten times quieter than the thump. One home-scoped Web Audio context is unlocked by a real pointer or keyboard gesture; mute carries between fridge and TV. The empty TV receiver uses gain 0.003, fades smoothly, stays silent on paused ready clips, and disconnects on scene exit. An empty TV shows “Tap for sound” until a gesture creates its audio context. Sounds suspend in hidden tabs. No third-party audio recording is bundled.
+The door accelerates into contact; its closing tween's completion triggers a short synthesized seal thump, followed 25 ms later by a quiet recorded glass rattle. There is no separate timestamp or asynchronous loading in the impact callback. The recording is decoded ahead of the entrance; if it is unavailable at contact, only the thump plays. The glass is low-pass filtered at 4.2 kHz and played at gain 0.018 behind the shared output gain 0.4. One home-scoped Web Audio context is unlocked by a real pointer or keyboard gesture; mute carries between fridge and TV and stops any remaining closure sound. The empty TV receiver uses gain 0.003, fades smoothly, stays silent on paused ready clips, and disconnects on scene exit. An empty TV shows “Tap for sound” until a gesture creates its audio context. Sounds suspend in hidden tabs.
+
+## Audio provenance
+
+- `apps/web/public/sound/glass-bottle-rattle.wav` derives from `sfx/vials-glass-rattle-04.wav` in Vehicle (Jan Schupke)'s [Fantasy Accessory SFX Library](https://lpc.opengameart.org/content/fantasy-accessory-sfx-library).
+- License: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). The source archive is `https://lpc.opengameart.org/sites/default/files/accessory.zip`.
+- Converted to mono, trimmed 23.7 ms of leading silence, and added a 5 ms end fade. Runtime export: 44.1 kHz, 16-bit PCM WAV, 0.372 seconds, 32,876 bytes. The low playback level and filtering are applied by Web Audio, not baked into the asset.
 
 ## Artwork provenance
 

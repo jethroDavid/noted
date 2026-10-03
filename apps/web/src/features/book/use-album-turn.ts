@@ -3,11 +3,18 @@
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import type { RefObject } from "react";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 
 gsap.registerPlugin(useGSAP);
 
 const SEGMENTS = 10;
+
+function readLeaves(root: RefObject<HTMLDivElement | null>) {
+  return {
+    left: root.current?.querySelector<HTMLElement>("[data-album-left]"),
+    right: root.current?.querySelector<HTMLElement>("[data-album-right]"),
+  };
+}
 
 function copyPageNode(node: Node): Node | null {
   if (node instanceof HTMLVideoElement) {
@@ -70,6 +77,7 @@ function copyLeaf(leaf: HTMLElement) {
 export function useAlbumTurn(
   root: RefObject<HTMLDivElement | null>,
   page: number,
+  opening: boolean,
 ) {
   const pending = useRef<{
     direction: number;
@@ -229,29 +237,31 @@ export function useAlbumTurn(
         reduced.removeEventListener("change", settle);
       };
     },
-    { scope: root, dependencies: [page], revertOnUpdate: true },
+    { scope: root, dependencies: [page, opening], revertOnUpdate: true },
   );
 
-  const turn = (direction: number, commit: () => void) => {
-    // A second request finishes the current sheet before starting the next;
-    // snapshots never stack up or leave the album between two spreads.
-    finish.current?.();
-    const left = root.current?.querySelector<HTMLElement>("[data-album-left]");
-    const right =
-      root.current?.querySelector<HTMLElement>("[data-album-right]");
-    if (
-      left &&
-      right &&
-      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      pending.current = {
-        direction,
-        left: copyLeaf(left),
-        right: copyLeaf(right),
-      };
-    }
-    commit();
-  };
+  const turn = useCallback(
+    (direction: number, commit: () => void) => {
+      // A second request finishes the current sheet before starting the next;
+      // snapshots never stack up or leave the album between two spreads.
+      finish.current?.();
+      const { left, right } = readLeaves(root);
+      if (
+        left &&
+        right &&
+        !document.hidden &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ) {
+        pending.current = {
+          direction,
+          left: copyLeaf(left),
+          right: copyLeaf(right),
+        };
+      }
+      commit();
+    },
+    [root],
+  );
 
   return turn;
 }

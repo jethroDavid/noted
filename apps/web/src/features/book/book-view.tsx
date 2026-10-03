@@ -3,7 +3,8 @@
 import { Button, ConnectionPill, Modal, PaperTexture } from "@noted/ui/src";
 import type { BookEntry } from "@noted/validators/src";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useRef, useState } from "react";
+import gsap from "gsap";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTRPC } from "../../trpc/react";
 import { useMediaEvents } from "../media/use-media-events";
 import { MemoryBackdrop } from "../motion/memory-backdrop";
@@ -66,12 +67,41 @@ function AlbumRibbon() {
 
 export function BookView({ homeId }: { homeId: string }) {
   const [page, setPage] = useState(0);
+  const [opening, setOpening] = useState(true);
   const albumRoot = useRef<HTMLDivElement>(null);
-  const turnAlbum = useAlbumTurn(albumRoot, page);
+  const turnAlbum = useAlbumTurn(albumRoot, page, opening);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const bookOptions = trpc.media.listBook.queryOptions({ homeId });
   const bookQuery = useQuery(bookOptions);
+  useEffect(() => {
+    if (!opening || !bookQuery.isSuccess) return;
+
+    // Let the scene arrive before turning its introductory leaf. Opening is
+    // mount-local, so realtime updates never restart this entrance.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const reveal = () => turnAlbum(1, () => setOpening(false));
+    const delay = gsap.delayedCall(
+      reduced.matches || document.hidden ? 0 : 0.65,
+      reveal,
+    );
+    const skip = () => {
+      delay.kill();
+      setOpening(false);
+    };
+    const onHidden = () => {
+      if (document.hidden) skip();
+    };
+    window.addEventListener("resize", skip);
+    document.addEventListener("visibilitychange", onHidden);
+    reduced.addEventListener("change", skip);
+    return () => {
+      delay.kill();
+      window.removeEventListener("resize", skip);
+      document.removeEventListener("visibilitychange", onHidden);
+      reduced.removeEventListener("change", skip);
+    };
+  }, [bookQuery.isSuccess, opening, turnAlbum]);
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: bookOptions.queryKey });
   };
@@ -141,7 +171,7 @@ export function BookView({ homeId }: { homeId: string }) {
                   Try again
                 </Button>
               </div>
-            ) : entries.length > 0 ? (
+            ) : entries.length > 0 && !opening ? (
               ([0, 1] as const).map((side) => (
                 <div
                   key={side}
@@ -235,7 +265,8 @@ export function BookView({ homeId }: { homeId: string }) {
             )}
           </div>
           <AlbumRibbon />
-          {pageCount > 1 &&
+          {!opening &&
+            pageCount > 1 &&
             ([-1, 1] as const).map((step) => (
               <button
                 key={step}
@@ -256,7 +287,7 @@ export function BookView({ homeId }: { homeId: string }) {
             ))}
         </div>
       </div>
-      {entries.length > 4 && (
+      {!opening && entries.length > 4 && (
         <nav
           aria-label="Photobook pages"
           className="absolute top-0 right-3 z-10 flex h-11 items-center gap-1 rounded-[4px_8px_3px_6px] bg-[#fffaf0]/85 text-[#65705a] sm:right-4"
