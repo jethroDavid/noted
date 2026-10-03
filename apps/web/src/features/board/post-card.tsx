@@ -117,13 +117,18 @@ export function PostCard({
     trpc.boards.move.mutationOptions({
       onMutate: (target) => {
         const snapshot = snapshotBoard();
-        patchBoard((posts) =>
-          posts.map((candidate) =>
-            candidate.id === post.id
-              ? { ...candidate, x: target.x, y: target.y }
-              : candidate,
-          ),
-        );
+        // The moved note sorts last at once (matching the server's
+        // updatedAt order) instead of dropping under the stack until the
+        // refetch lands.
+        patchBoard((posts) => {
+          const moved = posts
+            .filter((candidate) => candidate.id === post.id)
+            .map((candidate) => ({ ...candidate, x: target.x, y: target.y }));
+          return [
+            ...posts.filter((candidate) => candidate.id !== post.id),
+            ...moved,
+          ];
+        });
         return snapshot;
       },
       onSuccess: () => setError(null),

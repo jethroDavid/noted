@@ -253,7 +253,10 @@ export async function readBoard(
     .from(posts)
     .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
     .where(eq(posts.boardId, board.id))
-    .orderBy(asc(posts.createdAt), asc(posts.id));
+    // Array order is stack order (later paints on top), so the board sorts
+    // by last touch: moves and edits bump updatedAt, and the note just
+    // touched lands on top for every viewer.
+    .orderBy(asc(posts.updatedAt), asc(posts.id));
   const response: BoardPostsResponse = {
     board: {
       id: board.id,
