@@ -7,6 +7,7 @@ import { useId, useRef, useState } from "react";
 import { useTRPC } from "../../trpc/react";
 import { useMediaEvents } from "../media/use-media-events";
 import { MemoryBackdrop } from "../motion/memory-backdrop";
+import { AlbumClip } from "./album-clip";
 import { useAlbumTurn } from "./use-album-turn";
 
 function AlbumRibbon() {
@@ -156,18 +157,27 @@ export function BookView({ homeId }: { homeId: string }) {
                         key={entry.id}
                         data-scene-swipe
                         type="button"
+                        aria-label={
+                          entry.kind === "clip"
+                            ? `Open archived clip from ${entry.archivedAt.toLocaleDateString()}`
+                            : undefined
+                        }
                         onClick={() => {
                           setError(null);
                           setViewing(entry);
                         }}
-                        className={`home-album-photo relative flex min-h-0 min-w-0 cursor-pointer flex-col bg-[#f8f0dc] p-1.5 pb-2 shadow-[1px_3px_5px_#645f4930] transition-transform duration-300 hover:rotate-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] motion-reduce:transition-none sm:p-2 sm:pb-3 ${index === 0 ? "-rotate-2" : "rotate-1"}`}
+                        className={`home-album-photo relative isolate flex min-h-0 min-w-0 cursor-pointer flex-col bg-[#f8f0dc] p-1.5 pb-2 shadow-[1px_3px_5px_#645f4930] transition-transform duration-300 hover:rotate-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#42583d] motion-reduce:transition-none sm:p-2 sm:pb-3 ${index === 0 ? "-rotate-2" : "rotate-1"}`}
                       >
-                        <img
-                          src={entry.thumbnailUrl}
-                          draggable={false}
-                          alt={`Archived ${entry.archivedAt.toLocaleDateString()}`}
-                          className="min-h-0 w-full flex-1 bg-[#e9e3d6] object-contain"
-                        />
+                        {entry.kind === "clip" ? (
+                          <AlbumClip entry={entry} enabled={!viewing} />
+                        ) : (
+                          <img
+                            src={entry.thumbnailUrl}
+                            draggable={false}
+                            alt={`Archived ${entry.archivedAt.toLocaleDateString()}`}
+                            className="min-h-0 w-full flex-1 bg-[#e9e3d6] object-contain"
+                          />
+                        )}
                         <span className="mt-1 block text-[11px] text-[#65705a] sm:mt-2 sm:text-[15px]">
                           {entry.archivedAt.toLocaleDateString(undefined, {
                             month: "short",
@@ -217,7 +227,8 @@ export function BookView({ homeId }: { homeId: string }) {
                     A little space for memories.
                   </h2>
                   <p className="mt-3 text-[13px] leading-relaxed text-[#797968] sm:text-[18px]">
-                    Photos archived from the fridge find a home here.
+                    Photos from the fridge and clips from the TV find a home
+                    here.
                   </p>
                 </div>
               </>
@@ -275,12 +286,28 @@ export function BookView({ homeId }: { homeId: string }) {
       )}
 
       {viewing && (
-        <Modal title="Archived photo" onClose={() => setViewing(null)}>
-          <img
-            src={viewing.imageUrl}
-            alt="Archived entry at full size"
-            className="max-h-[60vh] w-full rounded object-contain"
-          />
+        <Modal
+          title={viewing.kind === "clip" ? "Archived clip" : "Archived photo"}
+          onClose={() => setViewing(null)}
+        >
+          {viewing.kind === "clip" ? (
+            <video
+              src={viewing.videoUrl}
+              poster={viewing.posterUrl ?? undefined}
+              controls
+              autoPlay
+              muted
+              playsInline
+              preload="metadata"
+              className="max-h-[60vh] w-full rounded bg-black object-contain"
+            />
+          ) : (
+            <img
+              src={viewing.imageUrl}
+              alt="Archived entry at full size"
+              className="max-h-[60vh] w-full rounded object-contain"
+            />
+          )}
           {error && (
             <p role="alert" className="mt-3 text-[#85513e]">
               {error}

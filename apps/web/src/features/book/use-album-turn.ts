@@ -9,8 +9,42 @@ gsap.registerPlugin(useGSAP);
 
 const SEGMENTS = 10;
 
+function copyPageNode(node: Node): Node | null {
+  if (node instanceof HTMLVideoElement) {
+    if (node.readyState < 2 || !node.videoWidth) return null;
+    const frame = document.createElement("canvas");
+    const scale = Math.min(
+      1,
+      480 / Math.max(node.videoWidth, node.videoHeight),
+    );
+    frame.width = Math.round(node.videoWidth * scale);
+    frame.height = Math.round(node.videoHeight * scale);
+    frame.className = node.className;
+    frame.style.cssText = node.style.cssText;
+    try {
+      const context = frame.getContext("2d");
+      if (!context) return null;
+      context.drawImage(node, 0, 0, frame.width, frame.height);
+      return frame;
+    } catch {
+      // The still poster beneath it remains available when a frame cannot draw.
+      return null;
+    }
+  }
+  const copy = node.cloneNode(false);
+  if (node instanceof HTMLCanvasElement && copy instanceof HTMLCanvasElement) {
+    copy.getContext("2d")?.drawImage(node, 0, 0);
+  }
+  for (const child of node.childNodes) {
+    const childCopy = copyPageNode(child);
+    if (childCopy) copy.appendChild(childCopy);
+  }
+  return copy;
+}
+
 function copyLeaf(leaf: HTMLElement) {
-  const copy = leaf.cloneNode(true) as HTMLElement;
+  // Never clone a media source into the moving sheet: it carries still frames.
+  const copy = copyPageNode(leaf) as HTMLElement;
   copy.removeAttribute("data-album-left");
   copy.removeAttribute("data-album-right");
   for (const svg of copy.querySelectorAll("svg")) {

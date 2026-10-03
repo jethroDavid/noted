@@ -5,8 +5,14 @@ export {
   cleanupMediaJobSchema,
   jobEnvelopeSchema,
   processMediaJobSchema,
+  sweepReelsJobSchema,
 } from "./jobs";
-export type { CleanupMediaJob, JobEnvelope, ProcessMediaJob } from "./jobs";
+export type {
+  CleanupMediaJob,
+  JobEnvelope,
+  ProcessMediaJob,
+  SweepReelsJob,
+} from "./jobs";
 export { queueEnv } from "./env";
 export type { QueueEnv } from "./env";
 export { publishJob } from "./publish";

@@ -239,15 +239,35 @@ export const reelSchema = z.object({
   videoUrl: z.string().min(1).nullable(),
   posterUrl: z.string().min(1).nullable(),
   createdAt: z.date(),
+  // Computed server-side (createdAt plus the domain reel lifetime): the
+  // sweep archives the reel to the photobook once this passes. Null for
+  // fixture reels, which stay on TV permanently and are never swept.
+  expiresAt: z.date().nullable(),
 });
 export const reelsResponseSchema = z.object({ reels: z.array(reelSchema) });
 
-export const bookEntrySchema = z.object({
+const photoBookEntrySchema = z.object({
+  kind: z.literal("photo"),
   id: bookEntryIdSchema,
   thumbnailUrl: z.string().min(1),
   imageUrl: z.string().min(1),
   archivedAt: z.date(),
 });
+const clipBookEntrySchema = z.object({
+  kind: z.literal("clip"),
+  id: bookEntryIdSchema,
+  // Null for posterless clips (poster generation failed): the page shows a
+  // placeholder tile and the modal still plays the video.
+  posterUrl: z.string().min(1).nullable(),
+  videoUrl: z.string().min(1),
+  archivedAt: z.date(),
+});
+// Book entries take the shape of the archived asset's kind: fridge photos
+// archive with a thumbnail, swept reels with a poster frame.
+export const bookEntrySchema = z.discriminatedUnion("kind", [
+  photoBookEntrySchema,
+  clipBookEntrySchema,
+]);
 export const bookResponseSchema = z.object({
   entries: z.array(bookEntrySchema),
 });

@@ -41,7 +41,7 @@ const HOME_ID = "123e4567-e89b-12d3-a456-426614174000";
 const ASSET_ID = "123e4567-e89b-42d3-a456-426614174999";
 
 describe("job envelopes", () => {
-  it("accepts both job shapes", () => {
+  it("accepts all job shapes", () => {
     expect(
       jobEnvelopeSchema.safeParse({
         job: "process-media",
@@ -57,6 +57,9 @@ describe("job envelopes", () => {
         keys: ["homes/x/originals/y.jpg"],
       }).success,
     ).toBe(true);
+    expect(jobEnvelopeSchema.safeParse({ job: "sweep-reels" }).success).toBe(
+      true,
+    );
   });
 
   it("rejects unknown jobs and empty cleanups", () => {

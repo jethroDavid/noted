@@ -50,8 +50,10 @@ by email via the Members panel as in Phase 2):
    (one-time alias setup:
    `docker exec noted-minio-1 mc alias set local http://localhost:9000 noted notednoted`)
    → no keys under the deleted asset's folder remain.
-6. A deletes the uploaded reel (x on the reel) → it leaves both feeds
-   at once; its blobs go too (same `mc ls` check).
+6. A moves the uploaded reel to the photobook (⋯ menu → Move to
+   photobook) → it leaves both TVs at once and appears in both Books;
+   its blobs stay (the book entry still references the asset). B deletes
+   it forever from the book → its blobs go too (same `mc ls` check).
 7. A removes B (Members panel) → B's TV/Book flip to "Home not found"
    at once.
 

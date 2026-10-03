@@ -1,7 +1,12 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { bookEntries, db, mediaAssets, posts, reels } from "@noted/db/src";
-import { mediaDisplayStatus } from "@noted/domain/src";
+import {
+  isReelExpired,
+  mediaDisplayStatus,
+  REEL_LIFETIME_MS,
+  reelExpiresAt,
+} from "@noted/domain/src";
 import {
   deleteUploadBlobs,
   extensionForContentType,
@@ -18,7 +23,11 @@ import {
   viewUrl,
 } from "@noted/media/src";
 import { publishJob } from "@noted/queue/src";
-import type { CleanupMediaJob, ProcessMediaJob } from "@noted/queue/src";
+import type {
+  CleanupMediaJob,
+  ProcessMediaJob,
+  SweepReelsJob,
+} from "@noted/queue/src";
 import { subscribeToHome } from "@noted/realtime/src";
 import type {
   BookResponse,
@@ -31,7 +40,7 @@ import type {
 } from "@noted/validators/src";
 import { mediaEventSchema } from "@noted/validators/src";
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, like, lte, not } from "drizzle-orm";
 import { boardChanged, mediaChanged } from "./events";
 import { findMemberHome, requireMemberHome } from "./homes";
 import type { CurrentUser } from "./identity";
@@ -193,6 +202,11 @@ async function toReel(
     storageKey: asset.storageKey,
     variantKey: asset.posterKey,
   });
+  // Fixture reels stay on TV permanently: a null expiry tells the UI to
+  // show no countdown, matching the sweep's fixture exclusion.
+  const expiresAt = asset.storageKey.startsWith("fixtures/")
+    ? null
+    : reelExpiresAt(reel.createdAt);
   if (status !== "ready") {
     return {
       id: reel.id,
@@ -201,6 +215,7 @@ async function toReel(
       videoUrl: null,
       posterUrl: null,
       createdAt: reel.createdAt,
+      expiresAt,
     };
   }
   return {
@@ -210,6 +225,7 @@ async function toReel(
     videoUrl: await viewUrl(asset.storageKey),
     posterUrl: asset.posterKey ? await viewUrl(asset.posterKey) : null,
     createdAt: reel.createdAt,
+    expiresAt,
   };
 }
 
@@ -269,24 +285,47 @@ export async function listBook(
     .select({
       id: bookEntries.id,
       archivedAt: bookEntries.archivedAt,
+      kind: mediaAssets.kind,
       storageKey: mediaAssets.storageKey,
       thumbnailKey: mediaAssets.thumbnailKey,
+      posterKey: mediaAssets.posterKey,
     })
     .from(bookEntries)
     .innerJoin(mediaAssets, eq(bookEntries.mediaAssetId, mediaAssets.id))
     .where(eq(bookEntries.homeId, home.id))
-    .orderBy(desc(bookEntries.archivedAt), desc(bookEntries.id));
+    // Oldest first: like a physical photobook, new entries append at the
+    // back instead of jumping the front.
+    .orderBy(asc(bookEntries.archivedAt), asc(bookEntries.id));
   const entries = await Promise.all(
     rows.map(async (row) => {
-      const imageUrl = await viewUrl(row.storageKey);
-      return {
-        id: row.id,
-        thumbnailUrl: row.thumbnailKey
-          ? await viewUrl(row.thumbnailKey)
-          : imageUrl,
-        imageUrl,
-        archivedAt: row.archivedAt,
-      };
+      switch (row.kind) {
+        case "photo": {
+          const imageUrl = await viewUrl(row.storageKey);
+          return {
+            kind: "photo" as const,
+            id: row.id,
+            thumbnailUrl: row.thumbnailKey
+              ? await viewUrl(row.thumbnailKey)
+              : imageUrl,
+            imageUrl,
+            archivedAt: row.archivedAt,
+          };
+        }
+        case "video": {
+          // Empty posterKey is the posterless-reel marker: the page shows a
+          // placeholder tile and the modal still plays the video.
+          const posterUrl = row.posterKey ? await viewUrl(row.posterKey) : null;
+          return {
+            kind: "clip" as const,
+            id: row.id,
+            posterUrl,
+            videoUrl: await viewUrl(row.storageKey),
+            archivedAt: row.archivedAt,
+          };
+        }
+        default:
+          return assertNever(row.kind);
+      }
     }),
   );
   return { entries };
@@ -330,6 +369,56 @@ export async function deleteAssetIfOrphaned(
   );
 }
 
+interface ReelRemoval {
+  removed: boolean;
+  archived: boolean;
+  keys: string[];
+}
+
+// Removes one reel row: ready reels archive to the photobook, never-ready
+// ones (a failed or abandoned upload) are discarded with their orphaned
+// asset, mirroring removePost's photo path. Shared by manual delete and the
+// sweep; the only difference is who is recorded as the archiver. A missing
+// row (lost race, double delete) removes nothing and lets the caller decide
+// between NOT_FOUND and skip.
+async function removeReelRow(
+  transaction: Transaction,
+  reel: { id: string; homeId: string; mediaAssetId: string },
+  archivedByUserId: string,
+): Promise<ReelRemoval> {
+  const deleted = await transaction
+    .delete(reels)
+    .where(eq(reels.id, reel.id))
+    .returning({ id: reels.id });
+  if (deleted.length === 0)
+    return { removed: false, archived: false, keys: [] };
+  // Readiness is re-read inside the transaction so a poster landing
+  // mid-removal still archives instead of discarding the clip.
+  const [asset] = await transaction
+    .select()
+    .from(mediaAssets)
+    .where(eq(mediaAssets.id, reel.mediaAssetId))
+    .limit(1);
+  const status = asset
+    ? mediaDisplayStatus({
+        state: asset.state,
+        storageKey: asset.storageKey,
+        variantKey: asset.posterKey,
+      })
+    : "uploading";
+  if (status === "ready") {
+    await transaction.insert(bookEntries).values({
+      homeId: reel.homeId,
+      mediaAssetId: reel.mediaAssetId,
+      archivedFromReelId: reel.id,
+      archivedByUserId,
+    });
+    return { removed: true, archived: true, keys: [] };
+  }
+  const keys = await deleteAssetIfOrphaned(transaction, reel.mediaAssetId);
+  return { removed: true, archived: false, keys };
+}
+
 export async function deleteReel(
   user: CurrentUser,
   homeId: string,
@@ -344,17 +433,25 @@ export async function deleteReel(
   if (!reel) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Reel not found." });
   }
-  const keys = await db.transaction(async (transaction) => {
-    await transaction.delete(reels).where(eq(reels.id, reel.id));
-    return deleteAssetIfOrphaned(transaction, reel.mediaAssetId);
-  });
+  const outcome = await db.transaction(async (transaction) =>
+    removeReelRow(
+      transaction,
+      { id: reel.id, homeId: home.id, mediaAssetId: reel.mediaAssetId },
+      user.id,
+    ),
+  );
+  // The pre-check found the row, so a missing removal means a concurrent
+  // delete won the race: report NOT_FOUND like the row was never there.
+  if (!outcome.removed) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Reel not found." });
+  }
   await mediaChanged(home.id);
-  if (keys.length > 0) {
+  if (outcome.keys.length > 0) {
     await publishJob({
       job: "cleanup-media",
       homeId: home.id,
       assetId: reel.mediaAssetId,
-      keys,
+      keys: outcome.keys,
     });
   }
   return { reelId: reel.id };
@@ -559,5 +656,79 @@ export async function handleCleanupMedia(job: CleanupMediaJob): Promise<void> {
   const outcome = await deleteUploadBlobs(job.keys);
   console.log(
     `Cleaned up asset ${job.assetId}: ${outcome.deleted.length} blob(s) deleted, ${outcome.skipped.length} skipped.`,
+  );
+}
+
+// Reels swept per scheduled run. The job is cheap to repeat (a re-run finds
+// no rows), so the batch just bounds one worker invocation.
+const SWEEP_BATCH_SIZE = 100;
+
+// Archives every expired reel to the photobook: ready reels become clip
+// entries, never-ready ones (a lost process job stranded the upload) are
+// deleted like removePost's never-ready photos. Fixture reels are excluded
+// by key prefix — they are permanent sample content, not uploads.
+// Idempotent under retry and safe under overlapping runs: each reel moves
+// inside one transaction guarded by delete-returning, so a second run finds
+// no row and skips.
+export async function handleSweepReels(_job: SweepReelsJob): Promise<void> {
+  const now = new Date();
+  const candidates = await db
+    .select({
+      id: reels.id,
+      homeId: reels.homeId,
+      mediaAssetId: reels.mediaAssetId,
+      creatorUserId: reels.creatorUserId,
+      createdAt: reels.createdAt,
+    })
+    .from(reels)
+    .innerJoin(mediaAssets, eq(reels.mediaAssetId, mediaAssets.id))
+    .where(
+      and(
+        lte(reels.createdAt, new Date(now.getTime() - REEL_LIFETIME_MS)),
+        not(like(mediaAssets.storageKey, "fixtures/%")),
+      ),
+    )
+    .orderBy(asc(reels.createdAt), asc(reels.id))
+    .limit(SWEEP_BATCH_SIZE);
+  const sweptHomeIds = new Set<string>();
+  let archived = 0;
+  let discarded = 0;
+  for (const candidate of candidates) {
+    // The SQL cutoff prefilters; the domain owns the expiry decision.
+    if (!isReelExpired(candidate.createdAt, now)) continue;
+    const outcome = await db.transaction(async (transaction) =>
+      removeReelRow(
+        transaction,
+        {
+          id: candidate.id,
+          homeId: candidate.homeId,
+          mediaAssetId: candidate.mediaAssetId,
+        },
+        candidate.creatorUserId,
+      ),
+    );
+    // Lost a race with an overlapping sweep (or a manual delete): the
+    // row is already gone, so there is nothing to archive.
+    if (!outcome.removed) continue;
+    if (outcome.archived) {
+      archived += 1;
+    } else {
+      discarded += 1;
+      if (outcome.keys.length > 0) {
+        await publishJob({
+          job: "cleanup-media",
+          homeId: candidate.homeId,
+          assetId: candidate.mediaAssetId,
+          keys: outcome.keys,
+        });
+      }
+    }
+    sweptHomeIds.add(candidate.homeId);
+  }
+  for (const homeId of sweptHomeIds) {
+    await mediaChanged(homeId);
+  }
+  console.log(
+    `Swept reels: ${archived} archived, ${discarded} discarded, ${sweptHomeIds.size} home(s) changed.`,
   );
 }

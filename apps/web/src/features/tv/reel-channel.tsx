@@ -1,9 +1,17 @@
 "use client";
 
+import { daysUntilReelExpiry } from "@noted/domain/src";
 import { Spinner } from "@noted/ui/src";
 import type { Reel } from "@noted/validators/src";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
+
+function expiryLabel(expiresAt: Date): string {
+  const days = daysUntilReelExpiry(expiresAt, new Date());
+  if (days <= 0) return "Moving to photobook soon";
+  if (days === 1) return "Photobook tomorrow";
+  return `Photobook in ${days} days`;
+}
 
 export function ReelChannel({
   reel,
@@ -171,6 +179,11 @@ export function ReelChannel({
           </button>
         </>
       )}
+      {reel.expiresAt && (
+        <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-[#253c32]/60 px-2 py-1 text-[13px] text-[#fffaf0]">
+          {expiryLabel(reel.expiresAt)}
+        </span>
+      )}
       <button
         ref={menuButton}
         type="button"
@@ -213,7 +226,7 @@ export function ReelChannel({
             }}
             className="min-h-11 cursor-pointer rounded px-4 text-[17px] focus-visible:outline-2 focus-visible:outline-[#85513e] disabled:opacity-50"
           >
-            Delete clip
+            Move to photobook
           </button>
         </div>
       )}

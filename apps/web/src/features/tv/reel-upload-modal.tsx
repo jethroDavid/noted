@@ -1,5 +1,6 @@
 "use client";
 
+import { reelExpiresAt } from "@noted/domain/src";
 import { Button, Modal } from "@noted/ui/src";
 import { UPLOAD_RULES } from "@noted/validators/src";
 import type { Reel, ReelsResponse, UploadTicket } from "@noted/validators/src";
@@ -134,13 +135,15 @@ export function ReelUploadModal({
     // Show the spinner card instantly, before the server responds. The
     // refetch swaps the real reel in; failures drop this card.
     const tempId = crypto.randomUUID();
+    const createdAt = new Date();
     const optimistic: Reel = {
       id: tempId,
       homeId,
       status: "uploading",
       videoUrl: null,
       posterUrl: null,
-      createdAt: new Date(),
+      createdAt,
+      expiresAt: reelExpiresAt(createdAt),
     };
     queryClient.setQueryData<ReelsResponse>(reelsQueryKey, (old) =>
       old ? { ...old, reels: [optimistic, ...old.reels] } : old,

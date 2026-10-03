@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampNormalizedCoordinate, mediaDisplayStatus } from "./index";
+import {
+  clampNormalizedCoordinate,
+  daysUntilReelExpiry,
+  isReelExpired,
+  mediaDisplayStatus,
+  REEL_LIFETIME_MS,
+  reelExpiresAt,
+} from "./index";
 
 describe("clampNormalizedCoordinate", () => {
   it("clamps outside values into 0..1", () => {
@@ -62,5 +69,39 @@ describe("mediaDisplayStatus", () => {
         variantKey: null,
       }),
     ).toBe("ready");
+  });
+});
+
+describe("reel expiry", () => {
+  it("expires exactly one lifetime after creation", () => {
+    const createdAt = new Date("2026-01-01T00:00:00.000Z");
+    expect(reelExpiresAt(createdAt)).toEqual(
+      new Date(createdAt.getTime() + REEL_LIFETIME_MS),
+    );
+    expect(isReelExpired(createdAt, new Date(createdAt.getTime() - 1))).toBe(
+      false,
+    );
+    expect(
+      isReelExpired(
+        createdAt,
+        new Date(createdAt.getTime() + REEL_LIFETIME_MS),
+      ),
+    ).toBe(true);
+  });
+
+  it("counts whole days until reel expiry", () => {
+    const expiresAt = new Date("2026-01-08T00:00:00.000Z");
+    expect(
+      daysUntilReelExpiry(expiresAt, new Date("2026-01-01T00:00:00.000Z")),
+    ).toBe(7);
+    expect(
+      daysUntilReelExpiry(expiresAt, new Date("2026-01-07T12:00:00.000Z")),
+    ).toBe(1);
+    expect(
+      daysUntilReelExpiry(expiresAt, new Date("2026-01-08T00:00:00.000Z")),
+    ).toBe(0);
+    expect(
+      daysUntilReelExpiry(expiresAt, new Date("2026-01-09T00:00:00.000Z")),
+    ).toBe(0);
   });
 });

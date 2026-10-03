@@ -248,7 +248,10 @@ export const reels = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("reels_home_idx").on(table.homeId)],
+  (table) => [
+    index("reels_home_idx").on(table.homeId),
+    index("reels_created_idx").on(table.createdAt),
+  ],
 );
 
 // The photo-book store: images removed from the fridge archive here.
@@ -270,6 +273,8 @@ export const bookEntries = pgTable(
       }),
     // No FK: the source post row is deleted by the archiving transaction.
     archivedFromPostId: uuid("archived_from_post_id"),
+    // No FK: the source reel row is deleted by the sweep transaction.
+    archivedFromReelId: uuid("archived_from_reel_id"),
     archivedByUserId: uuid("archived_by_user_id")
       .notNull()
       .references(() => users.id, {

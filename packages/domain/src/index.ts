@@ -21,3 +21,24 @@ export function mediaDisplayStatus(asset: {
   if (asset.storageKey.startsWith("fixtures/")) return "ready";
   return "processing";
 }
+
+// How long a reel stays on the TV feed before the sweep archives it to
+// the photobook. One constant so the API, the worker, and the UI countdown
+// all agree on the window.
+export const REEL_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function reelExpiresAt(createdAt: Date): Date {
+  return new Date(createdAt.getTime() + REEL_LIFETIME_MS);
+}
+
+export function isReelExpired(createdAt: Date, now: Date): boolean {
+  return now.getTime() >= reelExpiresAt(createdAt).getTime();
+}
+
+// Whole days until a reel leaves the TV feed, for the countdown label.
+// Partial days round up (anything left today reads as 1); past expiry
+// clamps to 0.
+export function daysUntilReelExpiry(expiresAt: Date, now: Date): number {
+  const dayMs = 24 * 60 * 60 * 1000;
+  return Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / dayMs));
+}

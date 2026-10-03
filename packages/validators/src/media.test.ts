@@ -85,6 +85,7 @@ describe("media payloads", () => {
             videoUrl: "https://example.test/video.mp4",
             posterUrl: "https://example.test/poster.jpg",
             createdAt: now,
+            expiresAt: now,
           },
         ],
       }).success,
@@ -99,6 +100,43 @@ describe("media payloads", () => {
             videoUrl: null,
             posterUrl: null,
             createdAt: now,
+            expiresAt: now,
+          },
+          {
+            id: "123e4567-e89b-12d3-a456-426614174001",
+            homeId: HOME_ID,
+            status: "ready",
+            videoUrl: "https://example.test/video.mp4",
+            posterUrl: null,
+            createdAt: now,
+            expiresAt: null,
+          },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      bookResponseSchema.safeParse({
+        entries: [
+          {
+            kind: "photo",
+            id: "123e4567-e89b-12d3-a456-426614174002",
+            thumbnailUrl: "https://example.test/thumb.jpg",
+            imageUrl: "https://example.test/full.jpg",
+            archivedAt: now,
+          },
+          {
+            kind: "clip",
+            id: "123e4567-e89b-12d3-a456-426614174003",
+            posterUrl: "https://example.test/poster.jpg",
+            videoUrl: "https://example.test/video.mp4",
+            archivedAt: now,
+          },
+          {
+            kind: "clip",
+            id: "123e4567-e89b-12d3-a456-426614174004",
+            posterUrl: null,
+            videoUrl: "https://example.test/video.mp4",
+            archivedAt: now,
           },
         ],
       }).success,
@@ -114,7 +152,7 @@ describe("media payloads", () => {
           },
         ],
       }).success,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       mediaEventSchema.safeParse({
         type: "media-changed",
