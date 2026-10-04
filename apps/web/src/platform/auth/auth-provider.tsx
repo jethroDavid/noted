@@ -2,9 +2,11 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  getRedirectResult,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
 } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
@@ -28,6 +30,16 @@ export type AuthContextValue = AuthState & {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// The Capacitor shell injects window.Capacitor into the webview. Popups do
+// not work there, so native sign-in uses the redirect flow instead; desktop
+// web keeps the popup. No dependency: the bridge is detected structurally.
+function isNativeShell(): boolean {
+  const candidate = window as unknown as {
+    Capacitor?: { isNativePlatform?: () => boolean };
+  };
+  return candidate.Capacitor?.isNativePlatform?.() ?? false;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -55,10 +67,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [queryClient]);
 
+  // Surfaces redirect-flow failures on return; a no-op when the page was
+  // not reached via signInWithRedirect. Success flows through the auth
+  // state listener above like any other sign-in.
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return;
+    void getRedirectResult(webAuth()).catch(() => {
+      setError(
+        "Google sign-in failed. Check the NEXT_PUBLIC_FIREBASE_* values in .env.",
+      );
+    });
+  }, []);
+
   async function signIn() {
     setError(null);
     try {
-      await signInWithPopup(webAuth(), googleProvider);
+      if (isNativeShell()) {
+        await signInWithRedirect(webAuth(), googleProvider);
+      } else {
+        await signInWithPopup(webAuth(), googleProvider);
+      }
     } catch {
       setError(
         "Google sign-in failed. Check the NEXT_PUBLIC_FIREBASE_* values in .env.",
