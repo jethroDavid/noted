@@ -12,8 +12,6 @@ import {
   extensionForContentType,
   getObjectBytes,
   isMissingKey,
-  makePoster,
-  makeThumbnail,
   objectExists,
   originalKey,
   posterKey,
@@ -576,6 +574,10 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
     }
     throw error;
   }
+  // Variants pull sharp/ffmpeg native binaries — lazy-load so server
+  // bundles that never process media (tRPC routes) never evaluate them.
+  const { makePoster, makeThumbnail } =
+    await import("@noted/media/src/variants");
   switch (asset.kind) {
     case "photo": {
       let thumbnail;

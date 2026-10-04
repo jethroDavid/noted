@@ -21,5 +21,3 @@ export {
   viewUrl,
 } from "./s3";
 export type { CleanupOutcome, UploadTicket } from "./s3";
-export { makePoster, makeThumbnail } from "./variants";
-export type { Thumbnail } from "./variants";
