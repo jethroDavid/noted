@@ -2,7 +2,7 @@
 
 import { useGSAP } from "@gsap/react";
 import type { MemoryMotion } from "@noted/ui/memory-portal";
-import { PaperTexture } from "@noted/ui/src";
+import { createMemoryFrameClock, PaperTexture } from "@noted/ui/src";
 import gsap from "gsap";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -107,16 +107,13 @@ export function LoginScene({
             x(0);
             y(0);
           };
-          let lastFrame = 0;
-          const tick = (time: number) => {
+          const clock = createMemoryFrameClock();
+          const tick = (_time: number, delta: number) => {
+            if (document.visibilityState !== "visible") return;
             const frameRate = window.innerWidth < 640 ? 24 : 30;
-            if (
-              document.visibilityState !== "visible" ||
-              time - lastFrame < 1 / frameRate
-            )
-              return;
-            lastFrame = time;
-            motion.current.time = time;
+            const elapsed = clock(delta, frameRate);
+            if (elapsed === null) return;
+            motion.current.time = elapsed;
             renderFrame.current?.();
           };
           gsap.ticker.add(tick);

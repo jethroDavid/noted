@@ -2,6 +2,7 @@
 
 import { useGSAP } from "@gsap/react";
 import type { MemoryMotion } from "@noted/ui/memory-portal";
+import { createMemoryFrameClock } from "@noted/ui/src";
 import gsap from "gsap";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -100,13 +101,11 @@ function MemoryBackdropScene({ imageSrc }: { imageSrc: string }) {
             ease: "sine.out",
           });
           gsap.to(root.current, { opacity: 0.85, duration: 1.2 });
-          let previous = 0;
-          let elapsed = 0;
-          const tick = (time: number, delta: number) => {
+          const clock = createMemoryFrameClock();
+          const tick = (_time: number, delta: number) => {
             if (document.visibilityState !== "visible") return;
-            elapsed += Math.min(delta, 100) / 1000;
-            if (time - previous < 1 / (innerWidth < 640 ? 24 : 30)) return;
-            previous = time;
+            const elapsed = clock(delta, 30);
+            if (elapsed === null) return;
             motion.current.time = elapsed;
             renderFrame.current?.();
           };

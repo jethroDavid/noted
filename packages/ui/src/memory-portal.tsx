@@ -30,6 +30,8 @@ const vertexShader = `
   }
 `;
 
+const roomDefines = { MEMORY_ROOM: 1 };
+
 const fragmentShader = `
   uniform sampler2D uImage;
   uniform float uTime;
@@ -42,7 +44,17 @@ const fragmentShader = `
   varying vec2 vUv;
 
   float hash(vec2 p) {
+    #ifdef MEMORY_ROOM
+      // Integer mixing avoids the large sine-based hash's device-dependent precision.
+      uvec2 cell = uvec2(ivec2(floor(p)));
+      uint n = cell.x * 1664525u + cell.y * 1013904223u + 374761393u;
+      n = (n ^ (n >> 16u)) * 2246822519u;
+      n = (n ^ (n >> 13u)) * 3266489917u;
+      n = n ^ (n >> 16u);
+      return float(n >> 8u) * (1.0 / 16777216.0);
+    #else
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    #endif
   }
   float noise(vec2 p) {
     vec2 i = floor(p);
@@ -52,10 +64,31 @@ const fragmentShader = `
       mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0)), f.x), f.y);
   }
   float flow(vec2 p) {
+    #ifdef MEMORY_ROOM
+      return noise(p) * 0.67 + noise(p * 2.03 + 8.7) * 0.33;
+    #else
     return noise(p) * 0.57 + noise(p * 2.03 + 8.7) * 0.28 + noise(p * 4.01 + 3.2) * 0.15;
+    #endif
   }
   void main() {
     vec2 q = vUv - 0.5;
+    #ifdef MEMORY_ROOM
+      float t = uTime * 0.085;
+      vec2 liquid = vec2(flow(vUv * 3.3 + vec2(t, -t * 0.6)),
+        flow(vUv * 3.1 + vec2(-t * 0.5, t) + 7.0)) - 0.5;
+      vec2 fit = vec2(min(uAspect / uImageAspect, 1.0), min(uImageAspect / uAspect, 1.0));
+      vec2 imageUv = q * fit + 0.5 + liquid * 0.026 + q * dot(q, q) * 0.04;
+      // Rooms never use the login pull, echo or dispersion: sample the artwork once.
+      vec3 color = texture2D(uImage, imageUv).rgb;
+      float mist = flow(vUv * 4.4 + vec2(t * 0.7, -t * 0.4));
+      float distance = length(q * vec2(1.0, 1.3));
+      float radius = 0.63 * mix(0.55, 1.0, uReveal);
+      float alpha = 1.0 - smoothstep(radius - 0.14, radius + 0.16,
+        distance + (mist - 0.5) * 0.11);
+      float edge = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      alpha *= smoothstep(0.0, 0.08 + (mist - 0.5) * 0.05, edge) * uReveal;
+      color += (hash(vUv * 1200.0 + floor(uTime * 2.0)) - 0.5) * 0.006;
+    #else
     float memory = smoothstep(0.02, 0.95, uPull);
     float t = uTime * 0.085 + memory * 1.8;
     vec2 drift = vec2(flow(vUv * 2.4 + vec2(t, -t)),
@@ -100,6 +133,7 @@ const fragmentShader = `
     alpha *= uReveal;
     color += (hash(vUv * 1200.0 + floor(uTime * 2.0)) - 0.5) * 0.006;
     color += uPull * 0.045;
+    #endif
 
     gl_FragColor = vec4(color, alpha);
     #include <tonemapping_fragment>
@@ -193,6 +227,7 @@ function MemoryPlane({
         uniforms={uniforms}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
+        defines={variant === "room" ? roomDefines : undefined}
         transparent
         depthWrite={false}
         depthTest={false}
@@ -201,16 +236,84 @@ function MemoryPlane({
   );
 }
 
+// Give high-density phones a sharper buffer without asking them to shade an
+// unbounded number of pixels. Adapt to delivered frames, not CPU submission time.
+function MemoryRenderQuality({ variant }: { variant: "portal" | "room" }) {
+  const { size, setDpr } = useThree();
+  const quality = useRef({
+    ceiling: 1,
+    dpr: 1,
+    seconds: 0,
+    frames: 0,
+    stableSeconds: 0,
+  });
+
+  useEffect(() => {
+    const ceiling =
+      variant === "room"
+        ? Math.max(
+            1,
+            Math.min(
+              window.devicePixelRatio,
+              2,
+              Math.sqrt(1_500_000 / Math.max(1, size.width * size.height)),
+            ),
+          )
+        : Math.min(window.devicePixelRatio, 1.25);
+    quality.current = {
+      ceiling,
+      dpr: ceiling,
+      seconds: 0,
+      frames: 0,
+      stableSeconds: 0,
+    };
+    setDpr(ceiling);
+  }, [size.width, size.height, setDpr, variant]);
+
+  useFrame((_state, delta) => {
+    if (variant !== "room") return;
+    const sample = quality.current;
+    if (document.visibilityState !== "visible" || delta > 0.25) {
+      sample.seconds = sample.frames = sample.stableSeconds = 0;
+      return;
+    }
+    sample.seconds += delta;
+    sample.frames++;
+    if (sample.seconds < 2) return;
+    const fps = sample.frames / sample.seconds;
+    let dpr = sample.dpr;
+    if (fps < 24) {
+      dpr = Math.max(1, dpr * 0.85);
+      sample.stableSeconds = 0;
+    } else if (fps >= 28.5) {
+      sample.stableSeconds += sample.seconds;
+      if (sample.stableSeconds >= 8) {
+        dpr = Math.min(sample.ceiling, dpr + 0.1);
+        sample.stableSeconds = 0;
+      }
+    } else {
+      sample.stableSeconds = 0;
+    }
+    sample.seconds = sample.frames = 0;
+    if (dpr !== sample.dpr) {
+      sample.dpr = dpr;
+      setDpr(dpr);
+    }
+  });
+  return null;
+}
+
 export default function MemoryPortal(props: MemoryPortalProps) {
   return (
     <Canvas
       frameloop="demand"
-      dpr={[1, 1.25]}
+      dpr={props.variant === "room" ? [1, 2] : [1, 1.25]}
       gl={{ alpha: true, antialias: false, powerPreference: "low-power" }}
       fallback={null}
       aria-hidden="true"
       style={{ pointerEvents: "none" }}
     >
+      <MemoryRenderQuality variant={props.variant ?? "portal"} />
       <Suspense fallback={null}>
         <MemoryPlane {...props} />
       </Suspense>
