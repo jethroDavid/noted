@@ -28,10 +28,10 @@ the pill shows Offline, the stream — not the board — is broken. See
 ## Gates
 
 ```sh
-pnpm check   # format + lint + typecheck + test + build, all through turbo
+pnpm check   # format + lint + typecheck + test + synth + build, all through turbo
 ```
 
-CI mirrors the same five tasks. Nothing merges red.
+CI mirrors the same six tasks. Nothing merges red.
 
 ## Layout
 
@@ -45,9 +45,10 @@ CI mirrors the same five tasks. Nothing merges red.
 - `packages/auth` — Firebase server seam (verify ID tokens) and env.
 - `packages/validators` — pure zod schemas shared by API and app.
 - `packages/ui` — shared visual components.
+- `packages/infra` — AWS CDK app owning the production media bucket.
 - `tooling/*` — shared tsconfig, eslint, prettier, tailwind configs plus the CI setup action.
 
-Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` (+`queue` for worker routes) → `auth`/`db`/`domain`/`media`/`queue`/`realtime`/`validators`, enforced by lint.
+Libraries export `./src` directly and are typechecked, not built; only the app builds. Dependency direction is apps → `api` (+`queue` for worker routes) → `auth`/`db`/`domain`/`infra`/`media`/`queue`/`realtime`/`validators`, enforced by lint (`infra` is deploy-time only; nothing imports it at runtime).
 
 Source files declare their runtime boundary, enforced with ESLint's built-in `no-restricted-syntax`: backend packages start with `import "server-only";`, client UI modules start with `"use client";`, and shared `domain`/`validators` stay unmarked. App files declare either boundary; `"use server";` is reserved for Server Functions. Tests and type declarations are exempt. Node database tools use the standard `react-server` condition; Vitest aliases the marker to the package's own empty entry.
 

@@ -12,6 +12,8 @@ export default [
           patterns: [
             {
               group: [
+                "@noted/infra",
+                "@noted/infra/**",
                 "@noted/ui",
                 "@noted/ui/**",
                 "@noted/web",

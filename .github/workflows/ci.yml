@@ -93,6 +93,20 @@ jobs:
       - name: Test
         run: pnpm test
 
+  synth:
+    runs-on: ubuntu-latest
+    env:
+      APP_URL: https://ci.invalid
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup
+        uses: ./tooling/github/setup
+      - name: Copy env
+        shell: bash
+        run: cp .env.example .env
+      - name: Synth
+        run: pnpm synth
+
   build:
     runs-on: ubuntu-latest
     steps:

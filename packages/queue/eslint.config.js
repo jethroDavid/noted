@@ -20,6 +20,8 @@ export default [
                 "@noted/db/**",
                 "@noted/domain",
                 "@noted/domain/**",
+                "@noted/infra",
+                "@noted/infra/**",
                 "@noted/media",
                 "@noted/media/**",
                 "@noted/queue",

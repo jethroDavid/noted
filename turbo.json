@@ -36,9 +36,15 @@
     "studio": {
       "cache": false,
       "persistent": true
+    },
+    "synth": {
+      "outputs": ["cdk.out/**"]
     }
   },
   "globalEnv": [
+    "AWS_REGION",
+    "CDK_DEFAULT_ACCOUNT",
+    "CDK_DEFAULT_REGION",
     "DATABASE_URL",
     "REDIS_URL",
     "FIREBASE_SERVICE_ACCOUNT_KEY_INLINE",

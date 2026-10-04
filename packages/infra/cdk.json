@@ -1,0 +1,3 @@
+{
+  "app": "node --conditions=react-server --import tsx src/bin.ts"
+}

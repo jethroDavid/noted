@@ -3,7 +3,7 @@ import { boundaryConfig } from "@noted/eslint-config/boundaries";
 
 export default [
   ...base,
-  boundaryConfig("shared"),
+  boundaryConfig("server"),
   {
     rules: {
       "no-restricted-imports": [
@@ -36,7 +36,7 @@ export default [
                 "@noted/web/**",
               ],
               message:
-                "packages/validators must not import other workspace libraries (see README Layout).",
+                "packages/infra must not import other workspace libraries (see README Layout).",
             },
           ],
         },
