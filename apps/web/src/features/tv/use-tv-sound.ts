@@ -39,11 +39,7 @@ function createReceiver(context: AudioContext): Receiver {
   return { context, gain, hiss, hum };
 }
 
-export function useTvSound(
-  playing: boolean,
-  channel: string | null,
-  idle: boolean,
-) {
+export function useTvSound(idle: boolean) {
   const home = useHomeSound();
   const { context } = home;
   const receiver = useRef<Receiver | null>(null);
@@ -95,32 +91,13 @@ export function useTvSound(
       const audible = home.enabled && document.visibilityState === "visible";
       const now = audio.context.currentTime;
       audio.gain.gain.cancelScheduledValues(now);
-      // Empty channels have a barely audible buzz; paused clips stay quiet.
-      audio.gain.gain.setTargetAtTime(
-        audible ? (playing ? 0.014 : idle ? 0.003 : 0) : 0,
-        now,
-        0.18,
-      );
+      // Only channels with no media buzz; clips play their own audio.
+      audio.gain.gain.setTargetAtTime(audible && idle ? 0.003 : 0, now, 0.18);
     };
     update();
     document.addEventListener("visibilitychange", update);
     return () => document.removeEventListener("visibilitychange", update);
-  }, [home.enabled, playing, idle, context]);
-
-  useEffect(() => {
-    const audio = receiver.current;
-    if (
-      !audio ||
-      !enabled ||
-      !playing ||
-      document.visibilityState !== "visible"
-    )
-      return;
-    const now = audio.context.currentTime;
-    audio.gain.gain.cancelScheduledValues(now);
-    audio.gain.gain.setValueAtTime(0.04, now);
-    audio.gain.gain.exponentialRampToValueAtTime(0.014, now + 0.18);
-  }, [channel, enabled, playing]);
+  }, [home.enabled, idle, context]);
 
   return { enabled, blocked, unavailable, toggle, unlock, onAutoplayBlocked };
 }

@@ -23,7 +23,6 @@ export function ReelsView({ homeId }: { homeId: string }) {
   const screen = useRef<HTMLDivElement>(null);
   const fullscreen = useTvFullscreen(screen);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [playingId, setPlayingId] = useState<string | null>(null);
   function toggleSound() {
     const clip = viewport.current?.querySelector<HTMLVideoElement>(
       `[data-reel-id="${activeId}"] video`,
@@ -78,8 +77,6 @@ export function ReelsView({ homeId }: { homeId: string }) {
   const reels = reelsQuery.data?.reels ?? [];
   const activeReel = reels.find((reel) => reel.id === activeId) ?? reels[0];
   const sound = useTvSound(
-    playingId === activeId && activeId !== null,
-    activeId,
     activeReel?.status !== "ready" || !activeReel.videoUrl,
   );
   const { scrollToClip, settle: settleWrap } = useReelWrapScroll(
@@ -205,11 +202,6 @@ export function ReelsView({ homeId }: { homeId: string }) {
                     onAutoplayBlocked={sound.onAutoplayBlocked}
                     singleClip={readyCount === 1}
                     onEnded={advance}
-                    onPlayback={(id, playing) => {
-                      setPlayingId((current) =>
-                        playing ? id : current === id ? null : current,
-                      );
-                    }}
                     onDelete={() => remove.mutate({ homeId, reelId: reel.id })}
                   />
                 ))

@@ -21,7 +21,6 @@ export function ReelChannel({
   deleting,
   soundEnabled,
   onAutoplayBlocked,
-  onPlayback,
   onEnded,
   singleClip,
   isActive,
@@ -33,7 +32,6 @@ export function ReelChannel({
   deleting: boolean;
   soundEnabled: boolean;
   onAutoplayBlocked: () => void;
-  onPlayback: (id: string, playing: boolean) => void;
   onEnded: (id: string) => void;
   singleClip: boolean;
   isActive: boolean;
@@ -141,11 +139,9 @@ export function ReelChannel({
             preload="metadata"
             onPlaying={() => {
               setPlaying(true);
-              onPlayback(reel.id, true);
             }}
             onPause={() => {
               setPlaying(false);
-              onPlayback(reel.id, false);
             }}
             onEnded={() => {
               if (active.current) onEnded(reel.id);
