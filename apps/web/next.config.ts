@@ -11,8 +11,10 @@ const config: NextConfig = {
   reactStrictMode: true,
   // ffmpeg-static resolves its binary relative to its own module path at
   // runtime; bundling relocates the module and the exe lookup breaks
-  // (ENOENT under a virtual path), so it stays external.
-  serverExternalPackages: ["ffmpeg-static"],
+  // (ENOENT under a virtual path), so it stays external. firebase-admin
+  // (plus its jwks-rsa/jose tree) also stays external: bundling the auth
+  // SDK risks CJS/ESM interop breaks at token-verification time.
+  serverExternalPackages: ["ffmpeg-static", "firebase-admin"],
   transpilePackages: [
     "@noted/api",
     "@noted/auth",

@@ -40,5 +40,10 @@
     "typescript": "catalog:",
     "vitest": "^5.0.1"
   },
-  "prettier": "@noted/prettier-config"
+  "prettier": "@noted/prettier-config",
+  "pnpm": {
+    "overrides": {
+      "jose": "^5.10.0"
+    }
+  }
 }
