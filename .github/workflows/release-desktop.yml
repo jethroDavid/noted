@@ -1,0 +1,24 @@
+name: Release desktop
+
+on:
+  push:
+    tags: ["desktop-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup
+        uses: ./tooling/github/setup
+      - name: Build installer
+        shell: bash
+        run: pnpm --filter @noted/desktop build:installer
+      - name: Create release
+        shell: bash
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes apps/desktop/release/*.exe
+        env:
+          GH_TOKEN: ${{ github.token }}

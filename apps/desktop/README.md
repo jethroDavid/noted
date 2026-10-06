@@ -20,6 +20,12 @@ duplication — the web app and its tRPC links run as-is.
 - `pnpm --filter @noted/desktop assets` — regenerate `resources/icon.ico`
   from `resources/icon.png` (brand-master artwork, mirrored from mobile)
 
+## Release
+
+Push a `desktop-v*` tag from green `main` (bump `version` here first); the
+`Release desktop` workflow builds the installer on Windows and attaches it
+to the GitHub Release. Unsigned builds trip SmartScreen on other machines.
+
 ## Notes
 
 - Google sign-in keeps the popup flow inside the window (popups work on
