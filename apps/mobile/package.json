@@ -1,0 +1,31 @@
+{
+  "name": "@noted/mobile",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "cap sync android",
+    "sync": "cap sync android",
+    "open:android": "cap open android",
+    "run:android": "cap sync android && cap run android",
+    "build:apk": "cap sync android && cd android && (gradlew assembleDebug || ./gradlew assembleDebug)",
+    "assets": "capacitor-assets generate --android --iconBackgroundColor #2A6090 --splashBackgroundColor #2A6090",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/camera": "^8.2.5",
+    "@capacitor/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@noted/prettier-config"
+}

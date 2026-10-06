@@ -1,6 +1,6 @@
 # Phase 4 — S3 deploy runbook
 
-Status: ready, blocked on `APP_URL` (needs the Vercel project URL). The stack code lives in `packages/infra`; this note covers only the residual manual steps that code cannot own.
+Status: deployed 2026-10-04 to `https://noted-six-chi.vercel.app` (bucket `notedmedia-mediaa721a567-tbmc55vx2kk6`, writer `NotedMedia-MediaWriterA65992AE-pvyGSgHjxjIq`). The stack code lives in `packages/infra`; this note covers only the residual manual steps that code cannot own.
 
 Target: account `576884309830`, region `us-east-1`, via the `noted` AWS profile. The profile's own region default differs, so every command below pins `us-east-1` explicitly — do not rely on the default.
 

@@ -2,8 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  getRedirectResult,
   signOut as firebaseSignOut,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
@@ -11,6 +11,7 @@ import {
 import type { User } from "firebase/auth";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { isNativeShell } from "../device";
 import {
   googleProvider,
   isFirebaseConfigured,
@@ -30,16 +31,6 @@ export type AuthContextValue = AuthState & {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-// The Capacitor shell injects window.Capacitor into the webview. Popups do
-// not work there, so native sign-in uses the redirect flow instead; desktop
-// web keeps the popup. No dependency: the bridge is detected structurally.
-function isNativeShell(): boolean {
-  const candidate = window as unknown as {
-    Capacitor?: { isNativePlatform?: () => boolean };
-  };
-  return candidate.Capacitor?.isNativePlatform?.() ?? false;
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();

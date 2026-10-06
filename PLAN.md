@@ -5,31 +5,31 @@ Status: Accepted 2026-09-24 — the rebuild roadmap. This is a demo of skill, no
 ## Progress
 
 - [x] Phase 0 — Foundation scaffold
-- [ ] Phase 1 — Shared noting core
-- [ ] Phase 2 — Realtime backbone
-- [ ] Phase 3 — TV reels, photo book, media pipeline
+- [ ] Phase 1 — Shared noting core (implemented 2026-09-26; live review pending — see `docs/plans/phase-1-live-review.md`)
+- [ ] Phase 2 — Realtime backbone (SSE transport implemented 2026-09-26; live review pending — see `docs/plans/phase-2-live-review.md`)
+- [ ] Phase 3 — TV reels, photo book, media pipeline (implemented 2026-09-28; live review pending — see `docs/plans/phase-3-live-review.md`; Phase 2 live review still open, sequencing waived by owner)
 - [ ] Phase 4 — Hardening and Vercel deploy
 
 ## 1. The demo
 
-One shared family kitchen, fixed scene: kitchen background, fridge board with text and photo notes (drag, modal edit; text notes use one-hour grey removal with shared Undo, removed photos archive straight to the book), a TV with a vertical short-video feed (reels-style playback), and a photo book that auto-archives images removed from the fridge. Multi-user shared homes with Google auth. No themes, no voice, no native shells in the demo.
+One shared family kitchen, fixed scene: kitchen background, fridge board with text and photo notes (drag, modal edit; deleting a text note removes it instantly with a 10-second Undo toast, removed photos archive straight to the book), a TV with a vertical short-video feed (reels-style playback), and a photo book that auto-archives images removed from the fridge. Multi-user shared homes with Google auth. No themes, no voice, no native shells in the demo.
 
 ## 2. Architecture (settled)
 
 - Turbo shape: pnpm plus Turbo v2 pipeline, `apps/*` thin shells, `packages/*` single-responsibility, `tooling/*` shared configs, CI mirroring the local gate.
 - API: tRPC plus zod plus superjson is the only API definition; media uploads use a presigned-URL REST side-path to S3-compatible storage.
-- Realtime: Vercel-native WebSockets (public beta, Fluid) via the documented Next.js upgrade API; Redis pub/sub (Upstash via Vercel Marketplace) for cross-instance fan-out, rooms, and presence; client reconnect with resubscribe plus state reload. Mutations travel over tRPC, events publish to Redis, rooms broadcast to subscribers.
+- Realtime: tRPC subscriptions over SSE (plain HTTP streaming — no upgrade API, no beta, works in `next dev` and on Vercel); Redis pub/sub (Upstash via Vercel Marketplace) for cross-instance fan-out, rooms, and presence; client reconnect with resubscribe plus state reload. Mutations travel over tRPC, events publish to Redis, rooms broadcast to subscribers. (WebSocket transport superseded 2026-09-26: SSE is equally capable for one-way event taps and carries no beta or CLI/login cost.)
 - Cache: Redis caches board reads; mutation events invalidate. Local Redis via compose for development.
-- Queue and workers: Upstash QStash with publishers plus zod job schemas in `packages/queue` and HTTP API-route workers. Jobs: photo thumbnails, reels poster frames, variant cleanup on removal.
+- Queue and workers: Upstash QStash with publishers plus zod job schemas in `packages/queue` and HTTP API-route workers. Jobs: photo thumbnails, reels poster frames, variant cleanup on removal, scheduled reel sweep.
 - Data: Drizzle; local Postgres for development, managed Postgres service in production (Neon is the standing default). Firebase Google auth behind a small server seam.
 - Web: Next.js plus Tailwind plus a small board-art layer, hosted on Vercel.
 - The `architect` skill gates every structural change. Headline rule: the repo follows a clear pattern — the v1 hand-written `api-client` shape must never return.
 
 ## 3. Learnings carried from v1
 
-Keep: normalized 0..1 coordinates; last-save-wins with per-operation membership checks; one-hour grey removal with shared Undo for text, instant book archive for removed photos; server-anchored clock; preview-then-commit drags; generation-stamped operations; flat SVG fallback when art fails; live two-account and physical-phone reviews gating every trust claim.
+Keep: normalized 0..1 coordinates; last-save-wins with per-operation membership checks; instant delete with a 10-second Undo toast for text, instant book archive for removed photos; server-anchored clock; preview-then-commit drags; generation-stamped operations; flat SVG fallback when art fails; live two-account and physical-phone reviews gating every trust claim.
 
-Changed: polling is replaced by WebSocket plus Redis realtime (polling survives only as Phase 1's temporary transport); themes, AI generation, and voice move to the product backlog.
+Changed: polling is replaced by SSE plus Redis realtime (polling survives only as Phase 1's temporary transport); themes, AI generation, and voice move to the product backlog.
 
 Banned: hand-written API clients; a single giant stylesheet; API contracts defined in more than one place; growth-decor complexity; per-theme geometry; bespoke framework-lets of any kind.
 
@@ -41,11 +41,11 @@ Turbo tree, shared configs, pipeline plus CI mirror, Drizzle with local Postgres
 
 ### Phase 1 — Shared noting core
 
-Auth plus homes, members, and fridge text and photo notes with text slow-removal plus Undo and instant photo archive to the book store (book UI lands in Phase 3); temporary refetch transport; seed plus fixtures including bundled fridge photos and sample reels. Exit: two-browser shared noting works end to end; gate green.
+Auth plus homes, members, and fridge text and photo notes with instant text delete plus a 10-second Undo toast and instant photo archive to the book store (book UI lands in Phase 3); temporary refetch transport; seed plus fixtures including bundled fridge photos and sample reels. Exit: two-browser shared noting works end to end; gate green.
 
 ### Phase 2 — Realtime backbone
 
-WebSocket route plus Fluid config plus Redis pub/sub rooms and fan-out plus client reconnect; board-read cache with event invalidation; compose gains local Redis; Upstash env wired. Polling removed. Exit: live two-browser updates; reconnect drill (kill plus resume) passes; cache hits verified.
+tRPC subscriptions over SSE plus Redis pub/sub rooms and fan-out plus client reconnect; board-read cache with event invalidation; compose gains local Redis; Upstash env wired. Polling removed. Exit: live two-browser updates; reconnect drill (kill plus resume) passes; cache hits verified.
 
 ### Phase 3 — TV reels, photo book, media pipeline
 
@@ -53,7 +53,7 @@ S3 presigned uploads; QStash publishers plus workers for thumbnails, poster fram
 
 ### Phase 4 — Hardening and Vercel deploy
 
-Neon plus Upstash plus S3 production wiring; rate and cost guards; Fluid and beta limits documented and verified; live two-account and physical-phone reviews. Exit: public demo URL; reviews pass; gates green.
+Neon plus Upstash plus S3 production wiring; rate and cost guards; Fluid connection limits documented and verified; live two-account and physical-phone reviews. Production QStash Schedules: create the `sweep-reels` daily cron (`0 3 * * *`, body `{"job":"sweep-reels"}`) pointing at `{APP_URL}/api/workers/sweep-reels` — see `docs/decisions/0006-reel-sweep.md` Ops. Exit: public demo URL; reviews pass; gates green.
 
 ### Later — product backlog (explicit non-goals)
 
@@ -76,7 +76,7 @@ Theme system plus AI generation, voice notes, Electron and Capacitor shells, map
 - `https://raw.githubusercontent.com/t3-oss/create-t3-turbo/main/packages/validators/package.json`
 - `https://raw.githubusercontent.com/t3-oss/create-t3-turbo/main/apps/nextjs/package.json`
 - `https://raw.githubusercontent.com/t3-oss/create-t3-turbo/main/.github/workflows/ci.yml`
-- `https://vercel.com/docs/functions/websockets`
+- Vercel WebSockets docs (informed the original transport choice; superseded with it on 2026-09-26)
 - `https://upstash.com/docs/redis`
 - `https://upstash.com/docs/qstash`
 - v1 tree and prior plans: `archive/noted-v1` tag (`PLAN.md`, `.agents/plans/2026-09-23-board-themes.md`)

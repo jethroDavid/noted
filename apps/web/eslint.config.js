@@ -8,6 +8,8 @@ export default [
   boundaryConfig("client", [
     "src/features/**/*.{ts,tsx}",
     "src/platform/auth/**/*.{ts,tsx}",
+    "src/platform/capture/**/*.{ts,tsx}",
+    "src/platform/device.ts",
     "src/trpc/**/*.{ts,tsx}",
   ]),
 ];

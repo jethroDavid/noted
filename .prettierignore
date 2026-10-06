@@ -16,3 +16,6 @@ playwright-report/
 
 # Generated files prettier must not touch
 pnpm-lock.yaml
+
+# Capacitor native project (generated Java/XML/Gradle shell)
+apps/mobile/android/

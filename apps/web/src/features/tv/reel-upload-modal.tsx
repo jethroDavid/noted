@@ -8,6 +8,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { pickGalleryVideo, recordVideo } from "../../platform/capture/capture";
+import { useNativeShell } from "../../platform/device";
 import { useTRPC } from "../../trpc/react";
 import { useUploadTicket, validateUploadFile } from "../media/upload";
 
@@ -27,6 +29,9 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Upload failed.";
 }
 
+const dashedChoice =
+  "w-full rounded-lg border border-dashed border-[#829070]/40 px-4 py-8 text-[17px] font-medium text-[#394b38] hover:border-[#42583d] disabled:opacity-50";
+
 export function ReelUploadModal({
   homeId,
   reelsQueryKey,
@@ -45,6 +50,9 @@ export function ReelUploadModal({
   );
   const fileInput = useRef<HTMLInputElement>(null);
   const { requestTicket, putBytes, confirmAsset } = useUploadTicket(homeId);
+  // The file input stays mounted as the universal fallback either way.
+  const native = useNativeShell();
+  const [capturing, setCapturing] = useState(false);
 
   // Revokes the previous preview URL whenever it is replaced, and the
   // current one when the modal unmounts.
@@ -69,6 +77,21 @@ export function ReelUploadModal({
       },
     }),
   );
+
+  // Native capture feeds the same validation + preview path as the file
+  // input; a cancelled capture is a silent no-op.
+  async function runCapture(action: () => Promise<File | null>) {
+    setCapturing(true);
+    setError(null);
+    try {
+      const captured = await action();
+      onFileSelected(captured ?? undefined);
+    } catch (captureError) {
+      setError(errorMessage(captureError));
+    } finally {
+      setCapturing(false);
+    }
+  }
 
   function onFileSelected(selected: File | undefined) {
     if (!selected) return;
@@ -170,10 +193,34 @@ export function ReelUploadModal({
             />
             <button
               type="button"
-              onClick={() => fileInput.current?.click()}
-              className="mt-2 text-[17px] font-medium text-[#394b38] underline hover:text-[#394b38]"
+              onClick={
+                native
+                  ? () => void runCapture(pickGalleryVideo)
+                  : () => fileInput.current?.click()
+              }
+              disabled={capturing}
+              className="mt-2 text-[17px] font-medium text-[#394b38] underline hover:text-[#394b38] disabled:opacity-50"
             >
               Choose a different clip
+            </button>
+          </div>
+        ) : native ? (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => void runCapture(recordVideo)}
+              disabled={capturing}
+              className={dashedChoice}
+            >
+              Record a clip
+            </button>
+            <button
+              type="button"
+              onClick={() => void runCapture(pickGalleryVideo)}
+              disabled={capturing}
+              className={dashedChoice}
+            >
+              Choose from gallery
             </button>
           </div>
         ) : (
