@@ -1,0 +1,15 @@
+appId: com.noted.app
+productName: Noted
+directories:
+  output: release
+  buildResources: resources
+files:
+  - dist/**
+  - "!dist/**/*.test.js"
+  - package.json
+win:
+  target: nsis
+  icon: icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

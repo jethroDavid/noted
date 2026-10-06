@@ -1,0 +1,29 @@
+{
+  "name": "@noted/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && electron dist/main.js",
+    "start": "electron dist/main.js",
+    "build": "tsc",
+    "build:installer": "tsc && electron-builder --win",
+    "assets": "node scripts/generate-icons.mjs",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.4",
+    "typescript": "catalog:"
+  },
+  "prettier": "@noted/prettier-config"
+}
