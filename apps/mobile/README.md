@@ -17,6 +17,13 @@ duplicated API client — the web app and its tRPC links run as-is.
   (`android/app/build/outputs/apk/debug/app-debug.apk`)
 - `pnpm --filter @noted/mobile assets` — regenerate icons/splash from `resources/`
 
+## Release
+
+Push a `mobile-v*` tag from green `main` (bump `versionName` in
+`android/app/build.gradle` first); the `Release mobile` workflow builds the
+debug APK on Ubuntu and attaches it to the GitHub Release. Debug builds
+install via sideloading, outside the Play Store flow.
+
 ## Notes
 
 - Native capture uses `@capacitor/camera` (take photo, record video, gallery
