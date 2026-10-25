@@ -19,11 +19,13 @@
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",
     "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "8.0.0",
     "@capacitor/browser": "^8.0.0",
     "@capacitor/camera": "^8.2.5",
     "@capacitor/core": "^8.0.0",
     "@capacitor/file-transfer": "^2.0.6",
     "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/network": "8.0.0",
     "@capacitor/share": "^8.0.3",
     "@noted/native-client": "workspace:*",
     "@noted/offline": "workspace:*",

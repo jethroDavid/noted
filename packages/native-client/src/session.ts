@@ -51,6 +51,7 @@ export interface NativeSession {
   active: boolean;
   pause(): Promise<void>;
   resume(): void;
+  retrySync(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -115,6 +116,11 @@ export async function openNativeSession(
       session.active = true;
       connect?.();
       void session.attachments.queue.startSync();
+    },
+    async retrySync() {
+      if (!isActive()) return;
+      if (!database.currentStatus.connected) connect?.();
+      await session.attachments.retry();
     },
     close() {
       session.active = false;
@@ -246,6 +252,11 @@ export async function openNativeSession(
       isActive,
       fetchCredentials: async () => {
         const { endpoint } = await client.sync.configuration.query();
+        const profile = await client.me.get.query();
+        await database.execute(
+          "INSERT OR REPLACE INTO account_profile (id,email,display_name) VALUES (?,?,?)",
+          [profile.user.id, profile.user.email, profile.user.displayName],
+        );
         await checkScopes();
         if (
           configuration.powersyncUrl &&
@@ -281,6 +292,7 @@ export async function browserSignIn(
   openBrowser: (url: string) => Promise<void>,
   onCode: (code: string) => void,
   signal: AbortSignal,
+  returnTo?: "android",
 ): Promise<string> {
   const verifier = Array.from(
     crypto.getRandomValues(new Uint8Array(32)),
@@ -297,7 +309,9 @@ export async function browserSignIn(
   const client = nativeApi(apiUrl);
   const { id, code } = await client.nativeAuth.begin.mutate({ challenge });
   onCode(code);
-  await openBrowser(`${apiUrl}/native-auth?id=${encodeURIComponent(id)}`);
+  await openBrowser(
+    `${apiUrl}/native-auth?id=${encodeURIComponent(id)}${returnTo === "android" ? "&returnTo=android" : ""}`,
+  );
   const expiresAt = Date.now() + 300_000;
   while (!signal.aborted && Date.now() < expiresAt) {
     const result = await client.nativeAuth.exchange.mutate(

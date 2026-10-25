@@ -9,6 +9,7 @@ export { saveNoteOperation, visibleNotesSql } from "./notes";
 export type { LocalTextNote } from "./notes";
 export { saveMediaOperation, writeMediaOperation } from "./media";
 export {
+  localMe,
   localHome,
   localPost,
   localBoard,

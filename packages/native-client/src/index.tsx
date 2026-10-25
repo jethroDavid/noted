@@ -1,7 +1,8 @@
 "use client";
 
+import { AuthContext, LoginScreen } from "@noted/experience/src";
 import { exportDiagnostics } from "@noted/offline/src";
-import { Modal, PaperTexture } from "@noted/ui/src";
+import { Modal } from "@noted/ui/src";
 import type { MediaOperation, NoteOperation } from "@noted/validators/sync";
 import type { CommonPowerSyncDatabase } from "@powersync/common";
 import {
@@ -10,10 +11,11 @@ import {
   signOut,
 } from "firebase/auth";
 import type { Auth, User } from "firebase/auth";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { NativeAttachments } from "./attachments";
 import type { NativeConfiguration } from "./config";
+import { NativeHomes } from "./homes";
 import { NativeScenes } from "./scenes";
 import { browserSignIn, openNativeSession, requiresSignIn } from "./session";
 import type { NativeSession } from "./session";
@@ -31,6 +33,9 @@ interface NativeAppOptions {
   createDatabase(filename: string): CommonPowerSyncDatabase;
   createStorage(scope: string): NativeMediaStorage;
   openBrowser(url: string): Promise<void>;
+  closeBrowser?(): Promise<void>;
+  authReturnTo?: "android";
+  subscribeWakeup?(callback: () => void): () => void;
 }
 
 function message(error: unknown) {
@@ -77,6 +82,8 @@ function NativeApp(options: NativeAppOptions) {
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  const [entered, setEntered] = useState(false);
+  const onEntered = useCallback(() => setEntered(true), []);
   const login = useRef<AbortController | null>(null);
   const lifecycle = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -121,6 +128,17 @@ function NativeApp(options: NativeAppOptions) {
     options.createStorage,
   ]);
 
+  useEffect(() => {
+    if (!user) setEntered(false);
+  }, [user]);
+  useEffect(
+    () =>
+      options.subscribeWakeup?.(() => {
+        void session?.retrySync().catch(() => {});
+      }),
+    [options.subscribeWakeup, session],
+  );
+
   async function signIn() {
     login.current?.abort();
     const controller = new AbortController();
@@ -133,9 +151,12 @@ function NativeApp(options: NativeAppOptions) {
         options.openBrowser,
         setCode,
         controller.signal,
+        options.authReturnTo,
       );
-      if (!controller.signal.aborted)
+      if (!controller.signal.aborted) {
         await signInWithCustomToken(options.auth, token);
+        await options.closeBrowser?.().catch(() => {});
+      }
     } catch (error) {
       if (!controller.signal.aborted) setError(message(error));
     } finally {
@@ -147,84 +168,59 @@ function NativeApp(options: NativeAppOptions) {
   }
 
   return (
-    <main className="relative isolate min-h-svh px-5 py-8 sm:px-10">
-      <PaperTexture />
-      <div className="relative mx-auto max-w-4xl">
-        <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-[#829070]/30 pb-5">
-          <h1 className="text-4xl font-bold">Noted</h1>
-          {user && <p className="text-sm">{user.email}</p>}
-        </header>
-        {user && code && (
-          <div role="status" className="mb-6 space-y-3">
-            <p>
-              Approve the sign-in in your browser using this code:{" "}
-              <strong>{code}</strong>
-            </p>
-            <button
-              className="min-h-11 underline"
-              onClick={() => {
-                login.current?.abort();
-                setSigningIn(false);
-                setCode(null);
-              }}
-            >
-              Cancel sign-in
-            </button>
-          </div>
-        )}
-        {error && (
-          <p role="alert" className="mb-5 text-red-800">
-            {error}
-          </p>
-        )}
-        {user === undefined ? (
-          <p role="status">Opening your notebook…</p>
-        ) : !user ? (
-          <section className="max-w-md space-y-6 py-12">
-            <h2 className="text-2xl">Your notes, here with you.</h2>
-            <p>
-              Sign in once while online. Your saved homes and text notes will
-              stay available on this device.
-            </p>
-            <button
-              className="min-h-12 rounded border px-5"
-              disabled={signingIn}
-              onClick={() => void signIn()}
-            >
-              Continue with Google
-            </button>
-            {code && (
-              <>
-                <p>Approve the sign-in in your browser using this code:</p>
-                <p className="text-3xl tracking-widest">{code}</p>
-                <button
-                  className="underline"
-                  onClick={() => {
-                    login.current?.abort();
-                    setSigningIn(false);
-                    setCode(null);
-                  }}
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-          </section>
-        ) : session?.accountId === user.uid ? (
-          <Workspace
-            key={user.uid}
-            session={session}
-            auth={options.auth}
-            onSignIn={() => void signIn()}
-            signingIn={signingIn}
-            apiUrl={options.configuration.apiUrl}
-            onExport={options.exportDiagnostics}
-          />
-        ) : (
-          <p role="status">Opening this account’s local notes…</p>
-        )}
-      </div>
-    </main>
+    <AuthContext.Provider
+      value={{
+        ...(user
+          ? { status: "signed-in" as const, user }
+          : {
+              status:
+                user === undefined
+                  ? ("loading" as const)
+                  : ("signed-out" as const),
+              user: null,
+            }),
+        error,
+        signIn,
+        signOut: async () => {},
+      }}
+    >
+      {entered && user && session?.accountId === user.uid ? (
+        <Workspace
+          key={user.uid}
+          session={session}
+          auth={options.auth}
+          onSignIn={() => void signIn()}
+          signingIn={signingIn}
+          apiUrl={options.configuration.apiUrl}
+          onExport={options.exportDiagnostics}
+        />
+      ) : (
+        <LoginScreen
+          entering={Boolean(user && session?.accountId === user.uid)}
+          onEntered={onEntered}
+        >
+          {code && (
+            <div role="status" className="mt-4 text-center">
+              <p>
+                Approve this code in your browser: <strong>{code}</strong>
+              </p>
+              <button
+                className="min-h-11 underline"
+                onClick={() => {
+                  login.current?.abort();
+                  setSigningIn(false);
+                  setCode(null);
+                }}
+              >
+                Cancel sign-in
+              </button>
+            </div>
+          )}
+          {user && !session && <p role="status">Opening your saved notes�</p>}
+          {error && <p role="alert">{error}</p>}
+        </LoginScreen>
+      )}
+    </AuthContext.Provider>
   );
 }
 
@@ -332,29 +328,9 @@ function Workspace({
     }
   }
 
-  return (
+  const notices = (
     <>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <label className="flex items-center gap-3">
-          Home{" "}
-          <select
-            className="min-h-11 rounded border px-3"
-            value={home?.id ?? ""}
-            onChange={(event) => {
-              setHomeId(event.target.value);
-              localStorage.setItem(
-                `noted-view:${auth.currentUser!.uid}`,
-                event.target.value,
-              );
-            }}
-          >
-            {homes.rows.map((home) => (
-              <option key={home.id} value={home.id}>
-                {home.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <p role="status">
           {pending.rows.length + pendingMedia.rows.length
             ? "Changes pending sync"
@@ -362,8 +338,13 @@ function Workspace({
               ? "Connected"
               : "Saved on this device"}
         </p>
-        <button className="min-h-11 underline" onClick={() => setLogout(true)}>
-          Sign out
+        <button
+          className="min-h-11 underline"
+          onClick={() =>
+            void session.retrySync().catch((error) => setError(message(error)))
+          }
+        >
+          Retry sync
         </button>
         <button
           className="min-h-11 underline"
@@ -426,33 +407,6 @@ function Workspace({
           onError={setError}
         />
       ))}
-      {home && board ? (
-        <>
-          <button
-            className="min-h-12 rounded border px-5"
-            onClick={() => setSceneOpen(true)}
-          >
-            Open {home.name}
-          </button>
-          {sceneOpen && (
-            <div className="fixed inset-0 z-20">
-              <NativeScenes
-                session={session}
-                auth={auth}
-                apiUrl={apiUrl}
-                homeId={home.id}
-                onBack={() => setSceneOpen(false)}
-              />
-            </div>
-          )}
-        </>
-      ) : (
-        <p className="py-10">
-          {status.hasSynced
-            ? "No home is available yet. Create or join a home in the web app, then return here."
-            : "Connect once to download your homes. Previously saved notes remain available offline."}
-        </p>
-      )}
       {logout && (
         <Modal
           title="Sign out"
@@ -527,6 +481,40 @@ function Workspace({
         </Modal>
       )}
     </>
+  );
+  return (
+    <AuthContext.Provider
+      value={{
+        status: "signed-in",
+        user: auth.currentUser!,
+        error: null,
+        signIn: async () => onSignIn(),
+        signOut: async () => setLogout(true),
+      }}
+    >
+      <NativeHomes
+        session={session}
+        auth={auth}
+        apiUrl={apiUrl}
+        notice={notices}
+        onOpen={(id) => {
+          setHomeId(id);
+          localStorage.setItem(`noted-view:${auth.currentUser!.uid}`, id);
+          setSceneOpen(true);
+        }}
+      />
+      {sceneOpen && home && board && (
+        <div className="fixed inset-0 z-20">
+          <NativeScenes
+            session={session}
+            auth={auth}
+            apiUrl={apiUrl}
+            homeId={home.id}
+            onBack={() => setSceneOpen(false)}
+          />
+        </div>
+      )}
+    </AuthContext.Provider>
   );
 }
 

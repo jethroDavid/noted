@@ -1,5 +1,6 @@
 "use client";
 
+import type { AppRouter } from "@noted/api/src";
 import {
   AuthContext,
   HomeScene,
@@ -8,11 +9,18 @@ import {
   TRPCProvider,
 } from "@noted/experience/src";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { inferRouterOutputs } from "@trpc/server";
 import type { Auth } from "firebase/auth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createSceneClient } from "./scene-client";
 import { nativeApi } from "./session";
 import type { NativeSession } from "./session";
+
+const contentRouters: readonly (keyof inferRouterOutputs<AppRouter>)[] = [
+  "boards",
+  "homes",
+  "media",
+];
 
 export function NativeScenes({
   session,
@@ -43,6 +51,7 @@ export function NativeScenes({
   const [archiveOffset, setArchiveOffset] = useState(0);
   const [status, setStatus] = useState(session.database.currentStatus);
   const [pending, setPending] = useState(0);
+  const [transferFailures, setTransferFailures] = useState(0);
   const [outcomes, setOutcomes] = useState(0);
   const [boardId, setBoardId] = useState<string>();
   const month = new Date(
@@ -80,20 +89,23 @@ export function NativeScenes({
       savePhoto: session.attachments.save,
       saveVideo: session.attachments.save,
       online: status.connected,
-      statusLabel: outcomes
-        ? "Changes need attention"
-        : pending
-          ? "Changes pending sync"
-          : status.uploadError || status.downloadError
-            ? "Sync paused"
-            : status.connected
-              ? viewSynced && !status.downloading
-                ? "Synced"
-                : "Syncing"
-              : "Saved on this device",
+      retrySync: session.retrySync,
+      statusLabel: transferFailures
+        ? "Media sync paused. Saved on this device."
+        : outcomes
+          ? "Changes need attention"
+          : pending
+            ? "Changes pending sync"
+            : status.uploadError || status.downloadError
+              ? "Sync paused"
+              : status.connected
+                ? viewSynced && !status.downloading
+                  ? "Synced"
+                  : "Syncing"
+                : "Saved on this device",
       loadOlderMemories: () => setArchiveOffset((offset) => offset + 1),
     }),
-    [session, status, pending, outcomes, viewSynced],
+    [session, status, pending, outcomes, viewSynced, transferFailures],
   );
   useEffect(() => {
     const abort = new AbortController();
@@ -128,7 +140,26 @@ export function NativeScenes({
         else notesPin = result;
       })
       .catch(() => {});
-    for (const table of [
+    let dirty = false;
+    const invalidate = () =>
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const path = query.queryKey[0];
+          return (
+            Array.isArray(path) &&
+            contentRouters.some((router) => router === String(path[0]))
+          );
+        },
+      });
+    const unsubscribeMutations = queryClient
+      .getMutationCache()
+      .subscribe(() => {
+        if (dirty && !queryClient.isMutating()) {
+          dirty = false;
+          void invalidate();
+        }
+      });
+    const tables = [
       "posts",
       "media_assets",
       "reels",
@@ -139,34 +170,46 @@ export function NativeScenes({
       "note_pending",
       "note_outcomes",
       "note_revisions",
-    ]) {
-      void (async () => {
-        for await (const _ of session.database.watch(
-          `SELECT * FROM ${table}`,
-          [],
-          { signal: abort.signal },
-        )) {
-          await queryClient.invalidateQueries();
-          const count =
+      "media_failures",
+    ];
+    void (async () => {
+      for await (const _ of session.database.watch(
+        tables
+          .map((table) => `SELECT '${table}' AS source,id FROM ${table}`)
+          .join(" UNION ALL "),
+        [],
+        { signal: abort.signal },
+      )) {
+        // A mutation owns its optimistic view until the local transaction resolves.
+        if (queryClient.isMutating()) dirty = true;
+        else await invalidate();
+        const count =
+          (
+            await session.database.get<{ count: number }>(
+              "SELECT count(*) AS count FROM note_pending",
+            )
+          ).count + (await session.attachments.pending());
+        const attention = (
+          await session.database.get<{ count: number }>(
+            "SELECT count(*) AS count FROM note_outcomes",
+          )
+        ).count;
+        if (!abort.signal.aborted) {
+          setTransferFailures(
             (
               await session.database.get<{ count: number }>(
-                "SELECT count(*) AS count FROM note_pending",
+                "SELECT count(*) AS count FROM media_failures",
               )
-            ).count + (await session.attachments.pending());
-          const attention = (
-            await session.database.get<{ count: number }>(
-              "SELECT count(*) AS count FROM note_outcomes",
-            )
-          ).count;
-          if (!abort.signal.aborted) {
-            setPending(count);
-            setOutcomes(attention);
-          }
+            ).count,
+          );
+          setPending(count);
+          setOutcomes(attention);
         }
-      })().catch(() => {});
-    }
+      }
+    })().catch(() => {});
     return () => {
       abort.abort();
+      unsubscribeMutations();
       pin?.unsubscribe();
       notesPin?.unsubscribe();
       queryClient.clear();
@@ -177,28 +220,49 @@ export function NativeScenes({
     const surface = root.current;
     if (!surface) return;
     const observed = new Set<Element>();
+    const visibleNodes = new Map<string, Set<Element>>();
+    const reported = new Map<string, boolean>();
+    const decorative = (node: Element) => {
+      const hidden = node.closest('[aria-hidden="true"]');
+      // A modal may hide the application above this root. Only decorative
+      // copies inside this scene are excluded; an open original stays pinned.
+      return hidden !== null && surface.contains(hidden);
+    };
+    const update = (node: Element, visible: boolean) => {
+      const asset = (node as HTMLElement).dataset.nativeAsset;
+      if (!asset) return;
+      const nodes = visibleNodes.get(asset) ?? new Set<Element>();
+      if (visible) nodes.add(node);
+      else nodes.delete(node);
+      visibleNodes.set(asset, nodes);
+      const next = nodes.size > 0,
+        previous = reported.get(asset);
+      if (previous === next || (previous === undefined && !next)) return;
+      reported.set(asset, next);
+      void session.attachments.view(asset, next).catch(() => {});
+    };
     const observer = new IntersectionObserver(
       (entries) => {
-        for (const entry of entries) {
-          const asset = (entry.target as HTMLElement).dataset.nativeAsset;
-          if (asset)
-            void session.attachments
-              .view(asset, entry.isIntersecting && entry.intersectionRatio > 0)
-              .catch(() => {});
-        }
+        for (const entry of entries)
+          update(
+            entry.target,
+            entry.target.isConnected &&
+              !decorative(entry.target) &&
+              entry.isIntersecting &&
+              entry.intersectionRatio > 0,
+          );
       },
       { threshold: 0.1 },
     );
     const scan = () => {
       for (const node of surface.querySelectorAll("[data-native-asset]"))
-        if (!observed.has(node)) {
+        if (!decorative(node) && !observed.has(node)) {
           observed.add(node);
           observer.observe(node);
         }
       for (const node of observed)
-        if (!node.isConnected) {
-          const asset = (node as HTMLElement).dataset.nativeAsset;
-          if (asset) void session.attachments.view(asset, false);
+        if (!node.isConnected || decorative(node)) {
+          update(node, false);
           observer.unobserve(node);
           observed.delete(node);
         }
@@ -209,9 +273,9 @@ export function NativeScenes({
     return () => {
       mutations.disconnect();
       observer.disconnect();
-      for (const node of observed) {
-        const asset = (node as HTMLElement).dataset.nativeAsset;
-        if (asset) void session.attachments.view(asset, false).catch(() => {});
+      for (const [asset, visible] of reported) {
+        if (visible)
+          void session.attachments.view(asset, false).catch(() => {});
       }
     };
   }, [session]);

@@ -3,6 +3,10 @@
 import { AttachmentTable, column, Schema, Table } from "@powersync/common";
 
 export const offlineSchema = new Schema({
+  account_profile: new Table(
+    { email: column.text, display_name: column.text },
+    { localOnly: true },
+  ),
   discarded_media: new Table({ created_at: column.text }, { localOnly: true }),
   access_notices: new Table({ notified: column.integer }, { localOnly: true }),
   sync_diagnostics: new Table(

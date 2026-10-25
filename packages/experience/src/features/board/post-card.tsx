@@ -4,7 +4,7 @@ import { clampBoardPostPosition, PaperTexture } from "@noted/ui/src";
 import type { BoardPost, BoardPostsResponse } from "@noted/validators/src";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useTRPC } from "../../trpc/react";
 import { PostBody, postCardAriaLabel, postCardColors } from "./post-kinds";
@@ -132,11 +132,23 @@ export function PostCard({
         return snapshot;
       },
       onSuccess: () => setError(null),
-      onError: (mutationError, _variables, context) =>
-        reportError(mutationError, context),
+      onError: (mutationError, _variables, context) => {
+        setPreview(null);
+        reportError(mutationError, context);
+      },
       onSettled: () => onMutated(),
     }),
   );
+  useEffect(() => {
+    if (
+      !move.isPending &&
+      !drag.current &&
+      preview &&
+      post.x === preview.x &&
+      post.y === preview.y
+    )
+      setPreview(null);
+  }, [post.x, post.y, preview, move.isPending]);
   const desiredPosition = preview ?? { x: post.x, y: post.y };
   const position = size
     ? clampBoardPostPosition(desiredPosition, size.surface, size.card)
@@ -202,8 +214,8 @@ export function PostCard({
       onPointerUp={() => {
         const state = drag.current;
         drag.current = null;
-        setPreview(null);
         if (!state) return;
+        if (!state.moved) setPreview(null);
         suppressClick.current = state.moved;
         if (state.moved) {
           move.mutate({

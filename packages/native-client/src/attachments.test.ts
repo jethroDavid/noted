@@ -10,13 +10,14 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import {
   createNoteConnector,
+  localMe,
   offlineSchema,
   saveMediaOperation,
   saveNoteOperation,
 } from "@noted/offline/src";
 import { NodeFileSystemAdapter, PowerSyncDatabase } from "@powersync/node";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAttachments } from "./attachments";
+import { createAttachments, nativeTransferCode } from "./attachments";
 import { createSceneClient } from "./scene-client";
 import type { nativeApi } from "./session";
 import type { NativeMediaStorage } from "./storage";
@@ -155,6 +156,92 @@ describe(
   "native original persistence and recovery",
   { timeout: 20_000 },
   () => {
+    it("loads homes from SQLite while offline and hides revoked homes", async () => {
+      const { database, remote } = await open();
+      const creator = crypto.randomUUID();
+      await database.execute(
+        "INSERT INTO account_profile (id,email,display_name) VALUES (?,?,?)",
+        [creator, "alice@example.com", "Alice"],
+      );
+      await database.execute(
+        "INSERT INTO homes (id,name,creator_user_id) VALUES (?,?,?)",
+        [homeId, "Offline home", creator],
+      );
+      await database.execute(
+        "INSERT INTO boards (id,home_id,kind) VALUES (?,?,'fridge')",
+        [boardId, homeId],
+      );
+      expect((await localMe(database)).homes).toMatchObject([
+        { id: homeId, name: "Offline home", role: "creator" },
+      ]);
+      await database.execute("INSERT INTO revoked_homes (id) VALUES (?)", [
+        homeId,
+      ]);
+      expect((await localMe(database)).homes).toEqual([]);
+      expect(remote.put).not.toHaveBeenCalled();
+    });
+    it("keeps native failure diagnostics bounded and makes backoff retryable", async () => {
+      expect(
+        nativeTransferCode({
+          code: "OS-PLUG-FLTR-0010",
+          data: { httpStatus: 403, body: "private" },
+          source: "signed-url",
+        }),
+      ).toBe("NATIVE_HTTP_403");
+      expect(nativeTransferCode({ code: "private-token" })).toBe(
+        "TRANSFER_FAILED",
+      );
+      const { database, manager } = await open();
+      const id = crypto.randomUUID();
+      await database.execute(
+        "INSERT INTO media_failures (id,attempts,retry_at,code) VALUES (?,2,?,'NATIVE_HTTP_403')",
+        [id, Date.now() + 3600000],
+      );
+      await manager.retry();
+      expect(
+        (
+          await database.get<{ retry_at: number }>(
+            "SELECT retry_at FROM media_failures WHERE id=?",
+            [id],
+          )
+        ).retry_at,
+      ).toBe(0);
+    });
+    it("requests visible originals using writes supported by PowerSync views", async () => {
+      const { database, manager } = await open();
+      const id = crypto.randomUUID();
+      await manager.view(id, false);
+      expect(
+        await database.get(
+          "SELECT visible,requested FROM media_views WHERE id=?",
+          [id],
+        ),
+      ).toMatchObject({ visible: 0, requested: 0 });
+      await manager.view(id, true);
+      expect(
+        await database.get(
+          "SELECT visible,requested FROM media_views WHERE id=?",
+          [id],
+        ),
+      ).toMatchObject({ visible: 1, requested: 1 });
+      await database.execute("UPDATE media_views SET requested=0 WHERE id=?", [
+        id,
+      ]);
+      await manager.view(id, false);
+      expect(
+        await database.get(
+          "SELECT visible,requested FROM media_views WHERE id=?",
+          [id],
+        ),
+      ).toMatchObject({ visible: 0, requested: 0 });
+      await manager.view(id, true);
+      expect(
+        await database.get(
+          "SELECT visible,requested FROM media_views WHERE id=?",
+          [id],
+        ),
+      ).toMatchObject({ visible: 1, requested: 1 });
+    });
     it("runs screen text operations through local SQLite without a network request", async () => {
       const ctx = await open();
       await ctx.database.execute(
@@ -176,6 +263,7 @@ describe(
           pinHistory: async () => {},
           pause: async () => {},
           resume: () => {},
+          retrySync: async () => {},
           close: async () => {},
         },
         "https://api.invalid",

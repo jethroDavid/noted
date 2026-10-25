@@ -5,6 +5,7 @@ import {
   localBoard,
   localBook,
   localHome,
+  localMe,
   localPost,
   localReels,
   saveMediaOperation,
@@ -43,6 +44,7 @@ export function createSceneClient(
     return result;
   };
   const local = {
+    me: { get: () => localMe(db) },
     homes: {
       get: (input: Inputs["homes"]["get"]): Promise<Outputs["homes"]["get"]> =>
         localHome(db, input.homeId),

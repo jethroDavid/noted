@@ -54,3 +54,38 @@ You are the architecture gate for this repo. Load this skill before creating pac
 - Metadata and original bytes use separate supported PowerSync queues. Stable client IDs, persisted originals before local acknowledgement, server-authorized checksum tickets, verification/commit before upload acknowledgement, and durable job intents are required. Android supplies filesystem/file-transfer/share adapters; desktop supplies OPFS. Cache eviction cannot delete pending originals or pinned work. Confirmed revocation follows discard-and-notify; network/auth failure preserves work.
 - Media worker completion closes durable intent; publishing alone does not. Release builds upsert scoped QStash recovery/sweep schedules after compile and migrations. S3 origins remain CDK-owned. Existing PowerSync publications are extended through committed SQL migrations; fresh setup documents the explicit table allowlist. Never publish receipt or worker-intent tables.
 - Build success and adapter/integration tests do not establish physical-device offline, maximum-video memory, account switching, or complete crash/recovery acceptance. Record those separately in `docs/plans/offline-first-architecture.md`.
+
+## Native Android repair patterns (2026-10-25)
+
+- `experience` also owns the original login scene and homes-list presentation.
+  Web supplies Next navigation; native supplies callback navigation and a local
+  `me.get` adapter. Keep one presentation source. `offline` owns the local-only
+  account profile cache; it may label synced homes but never replace their data.
+- Android auth success closes the system-browser controller. The approval page
+  may offer only the fixed credential-free `com.noted.app://auth/complete`
+  handoff; it resumes the existing verifier-bound exchange, never trusts an
+  identity or token from a URL. Shell App/Network events wake queues and reset
+  media backoff; connectivity is a retry hint, not backend reachability.
+- PowerSync tables are views. Use supported `INSERT OR REPLACE` triggers or
+  explicit read/update transactions; Android rejects `ON CONFLICT DO UPDATE`
+  against these views even where another driver rewrites it. Validate such
+  SQL against the actual native driver.
+- Native S3 PUT tickets must sign the explicit SHA-256 header, keeping it out of
+  the presigner's automatic query hoisting. A real Android transfer must match
+  the approved original length and checksum. Never log signed URLs or bodies.
+- Coalesce SQLite content notifications and defer cache invalidation while an
+  optimistic mutation owns its state. Keep a drag preview until the saved
+  coordinates render. Native touch tests use disposable content and clean it
+  through the normal version-checked deletion path.
+- Android sideload releases restore the persistent per-app signing key from an
+  encrypted Actions secret and fail closed if it is missing. Local release
+  builds select that key through `NOTED_ANDROID_DEBUG_KEYSTORE`; ordinary debug
+  builds may use the developer key. Never commit private keys. A lost previous
+  release key cannot be repaired by clearing the device database: protect and
+  sync pending work before any installation transition.
+
+- Native visibility excludes decorative aria-hidden animation copies inside the
+  scene and deduplicates visibility per asset. Do not unpin an original while a
+  live copy remains visible. Content invalidation uses the actual typed router
+  namespaces (`boards`, `homes`, `media`) so local media and downloaded originals
+  refresh open scenes.

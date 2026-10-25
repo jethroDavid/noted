@@ -19,6 +19,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Restore stable debug signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Configure ANDROID_DEBUG_KEYSTORE_BASE64 before releasing. Refusing a fresh ephemeral key."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/noted-debug.keystore"
+          chmod 600 "$RUNNER_TEMP/noted-debug.keystore"
+          echo "NOTED_ANDROID_DEBUG_KEYSTORE=$RUNNER_TEMP/noted-debug.keystore" >> "$GITHUB_ENV"
       - name: Build APK
         run: pnpm --filter @noted/mobile build:apk
       - name: Create release
@@ -27,6 +38,6 @@ jobs:
           apk="apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk"
           dest="noted-mobile-${version}-debug.apk"
           cp "$apk" "$dest"
-          gh release create "$GITHUB_REF_NAME" --generate-notes "$dest"
+          gh release create "$GITHUB_REF_NAME" --prerelease --generate-notes --notes "Debug-signed Android prerelease. Read apps/mobile/README.md for installation and signing details. GitHub v0.2.0 used a different signing key: keep that install until all pending work has synced before any reinstall." "$dest"
         env:
           GH_TOKEN: ${{ github.token }}

@@ -6,6 +6,7 @@ import { createContext, useContext } from "react";
 export interface OfflineContent {
   online: boolean;
   statusLabel: string;
+  retrySync?(): Promise<void>;
   loadOlderMemories?(): void;
   savePhoto(input: {
     homeId: string;
@@ -27,6 +28,14 @@ export function ConnectionPill({
   return offline ? (
     <p role="status" className="py-1 text-[15px] text-[#65705a]">
       {offline.statusLabel}
+      {offline.retrySync && (
+        <button
+          className="ml-3 min-h-11 underline"
+          onClick={() => void offline.retrySync?.().catch(() => {})}
+        >
+          Retry sync
+        </button>
+      )}
     </p>
   ) : (
     <OnlineConnectionPill status={status} />

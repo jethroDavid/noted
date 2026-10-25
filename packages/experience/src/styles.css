@@ -1,3 +1,4 @@
+@import "./login-scene.css";
 /* Object shading and soft memory edges; controls stay in Tailwind. */
 .home-room-memory {
   mask-image: radial-gradient(

@@ -4,7 +4,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "../../platform/auth/auth-provider";
 import { useTRPC } from "../../trpc/react";
 
-export function NativeAuthApproval({ id }: { id: string | null }) {
+export function NativeAuthApproval({
+  id,
+  returnTo,
+}: {
+  id: string | null;
+  returnTo?: "android";
+}) {
   const auth = useAuth();
   const trpc = useTRPC();
   const info = useQuery({
@@ -34,7 +40,17 @@ export function NativeAuthApproval({ id }: { id: string | null }) {
         ) : !info.data ? (
           <p role="status">Checking sign-in…</p>
         ) : approve.isSuccess || info.data.approved ? (
-          <p role="status">Approved. Return to your Noted app.</p>
+          <div className="space-y-4">
+            <p role="status">Approved. Return to your Noted app.</p>
+            {returnTo === "android" && (
+              <a
+                className="inline-flex min-h-12 items-center rounded border px-5"
+                href="com.noted.app://auth/complete"
+              >
+                Return to Noted
+              </a>
+            )}
+          </div>
         ) : (
           <>
             <p>Check that your app shows this same code:</p>

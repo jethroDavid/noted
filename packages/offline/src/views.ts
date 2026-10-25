@@ -4,6 +4,7 @@ import {
   boardPostsResponseSchema,
   bookResponseSchema,
   homeResponseSchema,
+  meResponseSchema,
   reelsResponseSchema,
 } from "@noted/validators/src";
 import type { CommonPowerSyncDatabase } from "@powersync/common";
@@ -24,6 +25,35 @@ async function pendingState(db: Database) {
   );
   return (id: string, assetId?: string) =>
     targets.has(id) || Boolean(assetId && originals.has(assetId));
+}
+export async function localMe(db: Database) {
+  const user = await db.getOptional<{
+    id: string;
+    email: string;
+    display_name: string | null;
+  }>("SELECT * FROM account_profile LIMIT 1");
+  const homes = await db.getAll<{
+    id: string;
+    name: string;
+    creator_user_id: string;
+    board_id: string;
+  }>(
+    "SELECT h.*,b.id AS board_id FROM homes h JOIN boards b ON b.home_id=h.id WHERE NOT EXISTS (SELECT 1 FROM revoked_homes WHERE id=h.id) ORDER BY h.name",
+  );
+  return meResponseSchema.parse({
+    user: {
+      id: user?.id ?? "00000000-0000-0000-0000-000000000000",
+      email: user?.email ?? "offline@noted.invalid",
+      displayName: user?.display_name ?? null,
+    },
+    homes: homes.map((h) => ({
+      id: h.id,
+      name: h.name,
+      boardId: h.board_id,
+      creatorUserId: h.creator_user_id,
+      role: h.creator_user_id === user?.id ? "creator" : "member",
+    })),
+  });
 }
 export async function localHome(db: Database, homeId: string) {
   const home = await db.getOptional<{

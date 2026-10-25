@@ -401,3 +401,63 @@ maximum-video memory measurement, and whole-system crash/recovery runs. No Andro
 device was connected for this checkpoint. Native source changes remain local;
 production backend, stream, bucket, and queue configuration must match before
 releasing the native clients.
+
+### Android repair checkpoint (2026-10-25)
+
+The v0.2.0 packaged release exposed gaps in the prior verification. Native startup
+had replaced the existing login animation and home list with a basic workspace.
+The repair shares those existing presentations through `experience`; native
+`me.get` reads homes and a local-only cached account profile from SQLite. Online
+profile refresh cannot replace the synced homes. Sign-out still uses the native
+sync-first / keep-local / cancel guard.
+
+Real Android API 32 instrumentation reproduced S3 HTTP 403: the request sent an
+unsigned `x-amz-checksum-sha256` header because the presigner had hoisted the
+checksum into the URL. Presigning now explicitly keeps that header signed.
+The same native bridge then uploaded 524311 bytes successfully to real S3;
+HEAD verified the matching SHA-256, and the disposable object was removed.
+Commit 95a382c contains only the server signing correction and its regression
+check so existing installs can recover without replacing their local database.
+
+Native success closes the browser; a fixed credential-free Android return link
+also resumes the verifier-bound exchange. App/network lifecycle plugins wake
+queues and reset persistent media backoff. Retry remains available explicitly;
+media failures expose bounded status codes rather than URLs, bodies, or tokens.
+SQLite content notifications are coalesced and wait for optimistic mutations to
+settle. Drag preview remains until the saved coordinates are rendered.
+
+Verified for the repair: 178 tests; repository lint, types, and formatting; web
+production compilation; Android APK compilation; API 32 instrumentation for
+browser close, auth-link resolution, and restored login DOM; the real S3 transfer
+above. The user completed Google sign-in on the repaired emulator, and its original
+home list rendered with all three synced homes. Visible media entered the
+native download queue after replacing the rejected view upsert. A native touch
+test created a disposable note, dragged it, observed 30 frames without returning
+to the old position after release, and deleted it through the normal UI.
+Physical-device drag smoothness, airplane-mode media recovery, gallery/camera
+picker behavior, and full video acceptance remain separate checks. A network-connected
+flag and a passing transport test do not establish those behaviors.
+
+The original GitHub v0.2.0 APK used an ephemeral debug certificate, different from
+both the developer debug key and the new dedicated per-app release key. Future release workflows restore one encrypted
+Actions keystore secret and fail closed if missing. This cannot recover the old
+private key or make a differently signed APK update it. No pending device data
+may be removed as a workaround; sync it before any installation transition.
+
+The two-file server hotfix deployed successfully through Vercel. The previously
+stuck photo 8df7a9e3-dc80-467f-9807-6ac9671dddaf subsequently gained server
+verification at 13:11:39 UTC, without replacing the installed APK. The previously
+reported video was still pending at the last check; device availability and its
+persisted retry deadline affect when that existing install retries.
+
+A final opt-in emulator test passed the complete fresh-photo UI path: choose a
+synthetic PNG through the existing file input, persist it in native storage,
+upload with server acknowledgement, render the native original, archive it,
+and remove it from the book through guarded UI mutations. Gallery/camera picker
+interaction is separate from that file-input ingestion check.
+
+Book animation copies initially generated a native visibility-write storm.
+Visibility now excludes decorative aria-hidden copies inside the scene, deduplicates
+per asset, and keeps an original pinned while any live copy is visible. Native
+content invalidation uses the actual typed `boards`, `homes`, and `media` router
+names; this also keeps an opened book/reel list current after local changes.

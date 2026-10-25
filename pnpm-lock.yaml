@@ -178,6 +178,9 @@ importers:
       '@capacitor/android':
         specifier: ^8.0.0
         version: 8.5.2(@capacitor/core@8.5.2)
+      '@capacitor/app':
+        specifier: 8.0.0
+        version: 8.0.0(@capacitor/core@8.5.2)
       '@capacitor/browser':
         specifier: ^8.0.0
         version: 8.0.5(@capacitor/core@8.5.2)
@@ -193,6 +196,9 @@ importers:
       '@capacitor/filesystem':
         specifier: ^8.1.5
         version: 8.1.5(@capacitor/core@8.5.2)
+      '@capacitor/network':
+        specifier: 8.0.0
+        version: 8.0.0(@capacitor/core@8.5.2)
       '@capacitor/share':
         specifier: ^8.0.3
         version: 8.0.3(@capacitor/core@8.5.2)
@@ -1197,6 +1203,11 @@ packages:
     peerDependencies:
       '@capacitor/core': ^8.5.0
 
+  '@capacitor/app@8.0.0':
+    resolution: {integrity: sha512-OwzIkUs4w433Bu9WWAEbEYngXEfJXZ9Wmdb8eoaqzYBgB0W9/3Ed/mh6sAYPNBAZlpyarmewgP7Nb+d3Vrh+xA==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
   '@capacitor/assets@3.0.5':
     resolution: {integrity: sha512-ohz/OUq61Y1Fc6aVSt0uDrUdeOA7oTH4pkWDbv/8I3UrPjH7oPkzYhShuDRUjekNp9RBi198VSFdt0CetpEOzw==}
     engines: {node: '>=10.3.0'}
@@ -1232,6 +1243,11 @@ packages:
 
   '@capacitor/filesystem@8.1.5':
     resolution: {integrity: sha512-m1RkI8L83NJeppEKyRWioK3MDp2vjlA+QfUQcF8/xRlcXNC2HYxqoyYJ+K4M0EcVovy+g+4F24S05+bhK4Vgdg==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/network@8.0.0':
+    resolution: {integrity: sha512-fgvB7pNKn8pKavuzys218j4YuA5euNfavp7nS3NuwWKWNupZAlbucfnl75lazxCyVF/ZRjzYVTb4vtTEfFrK1A==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -6880,6 +6896,10 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.5.2
 
+  '@capacitor/app@8.0.0(@capacitor/core@8.5.2)':
+    dependencies:
+      '@capacitor/core': 8.5.2
+
   '@capacitor/assets@3.0.5(@types/node@22.20.4)':
     dependencies:
       '@capacitor/cli': 5.7.8
@@ -6965,6 +6985,10 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.5.2
       '@capacitor/synapse': 1.0.4
+
+  '@capacitor/network@8.0.0(@capacitor/core@8.5.2)':
+    dependencies:
+      '@capacitor/core': 8.5.2
 
   '@capacitor/share@8.0.3(@capacitor/core@8.5.2)':
     dependencies:

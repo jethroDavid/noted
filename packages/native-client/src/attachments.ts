@@ -16,6 +16,18 @@ import { TRPCClientError } from "@trpc/client";
 import type { nativeApi } from "./session";
 import type { NativeMediaStorage } from "./storage";
 
+// Export only bounded error codes; native errors may contain signed URLs/body data.
+export function nativeTransferCode(error: unknown): string {
+  if (typeof error !== "object" || !error) return "TRANSFER_FAILED";
+  const native = error as { code?: unknown; data?: { httpStatus?: unknown } };
+  const status = Number(native.data?.httpStatus);
+  if (Number.isInteger(status) && status >= 400 && status <= 599)
+    return `NATIVE_HTTP_${status}`;
+  return typeof native.code === "string" &&
+    /^OS-PLUG-FLTR-\d{4}$/.test(native.code)
+    ? native.code
+    : "TRANSFER_FAILED";
+}
 type Client = ReturnType<typeof nativeApi>;
 class RetryDeferred extends Error {}
 const extension = (type: string) =>
@@ -65,7 +77,7 @@ export function createAttachments(
         : error instanceof Error &&
             ["ACCESS_REVOKED", "ITEM_DELETED"].includes(error.message)
           ? error.message
-          : "TRANSFER_FAILED";
+          : nativeTransferCode(error);
     await database.writeTransaction(async (tx) => {
       if (stage === "media-download" && code === "FORBIDDEN")
         await markHomeRevoked(tx, metadata(attachment).homeId);
@@ -320,6 +332,11 @@ export function createAttachments(
     });
   }
   return {
+    async retry() {
+      assertActive();
+      await database.execute("UPDATE media_failures SET retry_at=0");
+      await queue.syncStorage();
+    },
     queue,
     save,
     async discard(assetId: string, outcomeId: string) {
@@ -364,10 +381,23 @@ export function createAttachments(
       await this.discard(operation.assetId, outcomeId);
     },
     async view(assetId: string, visible: boolean) {
-      await database.execute(
-        "INSERT INTO media_views (id,last_viewed,visible,requested) VALUES (?,?,?,1) ON CONFLICT(id) DO UPDATE SET last_viewed=excluded.last_viewed,visible=excluded.visible,requested=CASE WHEN excluded.visible=1 THEN 1 ELSE requested END",
-        [assetId, Date.now(), visible ? 1 : 0],
-      );
+      // PowerSync tables are SQLite views. Android's SQLite rejects UPSERT
+      // against a view; use its supported replacement trigger in one transaction.
+      await database.writeTransaction(async (tx) => {
+        const previous = await tx.getOptional<{ requested: number }>(
+          "SELECT requested FROM media_views WHERE id=?",
+          [assetId],
+        );
+        await tx.execute(
+          "INSERT OR REPLACE INTO media_views (id,last_viewed,visible,requested) VALUES (?,?,?,?)",
+          [
+            assetId,
+            Date.now(),
+            visible ? 1 : 0,
+            visible ? 1 : (previous?.requested ?? 0),
+          ],
+        );
+      });
     },
     async initialize() {
       await storage.initialize();
