@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import {
   boards,
   bookEntries,
@@ -10,7 +11,6 @@ import {
 } from "@noted/db/src";
 import { mediaDisplayStatus } from "@noted/domain/src";
 import { viewUrl } from "@noted/media/src";
-import { publishJob } from "@noted/queue/src";
 import {
   isBoardViewerLive,
   leaveBoardPresence,
@@ -40,13 +40,17 @@ import {
   boardPostsResponseSchema,
   boardViewerSchema,
 } from "@noted/validators/src";
+import type { NoteOutcome } from "@noted/validators/sync";
 import { TRPCError } from "@trpc/server";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { boardChanged, mediaChanged } from "./events";
 import type { CurrentUser } from "./identity";
-import { deleteAssetIfOrphaned, requirePendingUpload } from "./media";
+import { requirePendingUpload } from "./media";
+import { applyMediaOperation } from "./media-sync";
+import { applyNoteOperation } from "./sync";
 
 const postColumns = {
+  revision: posts.revision,
   id: posts.id,
   boardId: posts.boardId,
   kind: posts.kind,
@@ -61,6 +65,7 @@ const postColumns = {
 };
 
 interface PostRow {
+  revision: number;
   id: string;
   boardId: string;
   kind: "text" | "photo";
@@ -104,6 +109,7 @@ async function toBoardPost(row: PostRow): Promise<BoardPost> {
     // and render a spinner until the worker's thumbnail lands.
     if (status !== "ready") {
       return {
+        revision: row.revision,
         id: row.id,
         boardId: row.boardId,
         kind: "photo",
@@ -140,6 +146,7 @@ async function toBoardPost(row: PostRow): Promise<BoardPost> {
     });
   }
   return {
+    revision: row.revision,
     id: row.id,
     boardId: row.boardId,
     kind: "text",
@@ -283,34 +290,20 @@ export async function createTextPost(
   homeId: string,
   boardId: string,
   input: CreateTextPostInput,
+  identity: { operationId?: string; postId?: string } = {},
 ): Promise<BoardPost> {
-  const board = await requireBoard(user, homeId, boardId);
-  const created = await db.transaction(async (transaction) => {
-    const [post] = await transaction
-      .insert(posts)
-      .values({
-        boardId: board.id,
-        creatorUserId: user.id,
-        kind: "text",
-        textContent: input.text,
-        mediaAssetId: null,
-        foregroundColor: input.foregroundColor,
-        backgroundColor: input.backgroundColor,
-        positionX: input.x,
-        positionY: input.y,
-      })
-      .returning(postColumns);
-    if (!post) throw new Error("Post insert returned no row.");
-    await bumpPostAdditions(transaction, board.id);
-    return toBoardPost({
-      ...post,
-      state: null,
-      storageKey: null,
-      thumbnailKey: null,
-    });
-  });
-  await boardChanged(board.id);
-  return created;
+  const postId = identity.postId ?? randomUUID();
+  ensureAccepted(
+    await applyNoteOperation(user, {
+      kind: "create",
+      homeId,
+      boardId,
+      postId,
+      operationId: identity.operationId ?? randomUUID(),
+      value: input,
+    }),
+  );
+  return toBoardPost(await requirePost(user, homeId, postId));
 }
 
 // Instant attach: the post row is created against the still-pending asset
@@ -323,36 +316,47 @@ export async function createUploadedPhoto(
   input: CreateUploadedPhotoInput,
 ): Promise<BoardPost> {
   const board = await requireBoard(user, homeId, boardId);
-  const asset = await requirePendingUpload(
-    board.homeId,
-    input.assetId,
-    "photo",
-  );
-  const row = await db.transaction(async (transaction) => {
-    const [post] = await transaction
+  const result = await db.transaction(async (tx) => {
+    const asset = await requirePendingUpload(
+      user,
+      homeId,
+      input.assetId,
+      "photo",
+      tx,
+    );
+    const [existing] = await tx
+      .select(postColumns)
+      .from(posts)
+      .where(eq(posts.mediaAssetId, asset.id))
+      .limit(1);
+    if (existing) {
+      if (existing.boardId !== boardId)
+        throw new TRPCError({ code: "CONFLICT" });
+      return { row: existing, asset };
+    }
+    if (asset.state !== "pending") throw new TRPCError({ code: "CONFLICT" });
+    const [row] = await tx
       .insert(posts)
       .values({
-        boardId: board.id,
+        boardId,
         creatorUserId: user.id,
         kind: "photo",
-        textContent: null,
         mediaAssetId: asset.id,
         positionX: input.x,
         positionY: input.y,
       })
       .returning(postColumns);
-    if (!post) throw new Error("Post insert returned no row.");
-    await bumpPostAdditions(transaction, board.id);
-    return post;
-  });
-  const created = await toBoardPost({
-    ...row,
-    state: asset.state,
-    storageKey: asset.storageKey,
-    thumbnailKey: asset.thumbnailKey,
+    if (!row) throw Error("Photo insert returned no row.");
+    await bumpPostAdditions(tx, boardId);
+    return { row, asset };
   });
   await boardChanged(board.id);
-  return created;
+  return toBoardPost({
+    ...result.row,
+    state: result.asset.state,
+    storageKey: result.asset.storageKey,
+    thumbnailKey: result.asset.thumbnailKey,
+  });
 }
 
 export async function editPostContent(
@@ -360,35 +364,20 @@ export async function editPostContent(
   homeId: string,
   postId: string,
   input: UpdatePostContentInput,
+  operationId: string = randomUUID(),
 ): Promise<BoardPost> {
   const post = await requirePost(user, homeId, postId);
-  if (post.kind !== "text") {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Only text notes can be edited.",
-    });
-  }
-  const [row] = await db
-    .update(posts)
-    .set({
-      textContent: input.text,
-      foregroundColor: input.foregroundColor,
-      backgroundColor: input.backgroundColor,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)))
-    .returning(postColumns);
-  if (!row) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
-  }
-  const edited = await toBoardPost({
-    ...row,
-    state: null,
-    storageKey: null,
-    thumbnailKey: null,
-  });
-  await boardChanged(edited.boardId);
-  return edited;
+  ensureAccepted(
+    await applyNoteOperation(user, {
+      kind: "edit",
+      homeId,
+      boardId: post.boardId,
+      postId,
+      operationId,
+      patch: input,
+    }),
+  );
+  return toBoardPost(await requirePost(user, homeId, postId));
 }
 
 export async function movePost(
@@ -396,24 +385,25 @@ export async function movePost(
   homeId: string,
   postId: string,
   input: UpdatePostPositionInput,
+  operationId: string = randomUUID(),
 ): Promise<BoardPost> {
   const post = await requirePost(user, homeId, postId);
-  const [row] = await db
-    .update(posts)
-    .set({ positionX: input.x, positionY: input.y, updatedAt: new Date() })
-    .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)))
-    .returning(postColumns);
-  if (!row) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Post not found." });
-  }
-  const moved = await toBoardPost({
-    ...row,
-    state: post.state,
-    storageKey: post.storageKey,
-    thumbnailKey: post.thumbnailKey,
-  });
-  await boardChanged(moved.boardId);
-  return moved;
+  const context = {
+    homeId,
+    boardId: post.boardId,
+    operationId,
+    ...input,
+  };
+  ensureAccepted(
+    post.kind === "text"
+      ? await applyNoteOperation(user, { ...context, kind: "move", postId })
+      : await applyMediaOperation(user, {
+          ...context,
+          kind: "move-photo",
+          itemId: postId,
+        }),
+  );
+  return toBoardPost(await requirePost(user, homeId, postId));
 }
 
 // The single removal for every post kind: text notes are deleted, ready
@@ -425,70 +415,30 @@ export async function removePost(
   user: CurrentUser,
   homeId: string,
   postId: string,
+  expectedRevision?: number,
+  operationId: string = randomUUID(),
 ): Promise<{ postId: string }> {
   const post = await requirePost(user, homeId, postId);
-  switch (post.kind) {
-    case "text": {
-      await db
-        .delete(posts)
-        .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)));
-      await boardChanged(post.boardId);
-      return { postId };
-    }
-    case "photo": {
-      if (!post.mediaAssetId) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Something went wrong. Please try again.",
-        });
-      }
-      const mediaAssetId = post.mediaAssetId;
-      // Readiness is re-read inside the transaction so a thumbnail landing
-      // mid-remove still archives instead of discarding the photo.
-      const outcome = await db.transaction(async (transaction) => {
-        await transaction
-          .delete(posts)
-          .where(and(eq(posts.id, postId), eq(posts.boardId, post.boardId)));
-        const [asset] = await transaction
-          .select()
-          .from(mediaAssets)
-          .where(eq(mediaAssets.id, mediaAssetId))
-          .limit(1);
-        const status = asset
-          ? mediaDisplayStatus({
-              state: asset.state,
-              storageKey: asset.storageKey,
-              variantKey: asset.thumbnailKey,
-            })
-          : "uploading";
-        if (status === "ready") {
-          await transaction.insert(bookEntries).values({
-            homeId,
-            mediaAssetId,
-            archivedFromPostId: postId,
-            archivedByUserId: user.id,
-          });
-          return { archived: true as const, keys: [] as string[] };
-        }
-        const keys = await deleteAssetIfOrphaned(transaction, mediaAssetId);
-        return { archived: false as const, keys };
-      });
-      await boardChanged(post.boardId);
-      if (outcome.archived) {
-        // Archiving changes the book too: Book subscribers refetch.
-        await mediaChanged(homeId);
-      } else if (outcome.keys.length > 0) {
-        await publishJob({
-          job: "cleanup-media",
-          homeId,
-          assetId: mediaAssetId,
-          keys: outcome.keys,
-        });
-      }
-      return { postId };
-    }
-  }
-  return assertNever(post.kind);
+  const context = {
+    homeId,
+    operationId,
+    expectedRevision: expectedRevision ?? post.revision,
+  };
+  ensureAccepted(
+    post.kind === "text"
+      ? await applyNoteOperation(user, {
+          ...context,
+          kind: "delete",
+          boardId: post.boardId,
+          postId,
+        })
+      : await applyMediaOperation(user, {
+          ...context,
+          kind: "archive-photo",
+          itemId: postId,
+        }),
+  );
+  return { postId };
 }
 
 async function restorePost(
@@ -497,41 +447,7 @@ async function restorePost(
   boardId: string,
   input: RestorePostInput,
 ): Promise<BoardPost> {
-  const board = await requireBoard(user, homeId, boardId);
-  return db.transaction(async (transaction) => {
-    // Restoring the exact snapshot keeps the note's identity, position, and
-    // place in creation order; repeated Undos converge on the same row.
-    const inserted = await transaction
-      .insert(posts)
-      .values({
-        id: input.postId,
-        boardId: board.id,
-        creatorUserId: user.id,
-        kind: "text",
-        textContent: input.text,
-        mediaAssetId: null,
-        foregroundColor: input.foregroundColor,
-        backgroundColor: input.backgroundColor,
-        positionX: input.x,
-        positionY: input.y,
-        createdAt: input.createdAt,
-      })
-      .onConflictDoNothing()
-      .returning({ id: posts.id });
-    const [post] = await transaction
-      .select(postColumns)
-      .from(posts)
-      .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
-      .limit(1);
-    if (!post) throw new Error("Restored post lookup returned no row.");
-    if (inserted.length > 0) await bumpPostAdditions(transaction, board.id);
-    return toBoardPost({
-      ...post,
-      state: null,
-      storageKey: null,
-      thumbnailKey: null,
-    });
-  });
+  return createTextPost(user, homeId, boardId, input);
 }
 
 async function restorePhotoPost(
@@ -540,69 +456,38 @@ async function restorePhotoPost(
   boardId: string,
   input: RestorePhotoPostInput,
 ): Promise<BoardPost> {
-  const board = await requireBoard(user, homeId, boardId);
-  return db.transaction(async (transaction) => {
-    // Repeat Undos converge on the existing row instead of failing on the
-    // already-consumed book entry, mirroring the text restore.
-    const [existing] = await transaction
-      .select(withMedia(postColumns))
-      .from(posts)
-      .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
-      .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
-      .limit(1);
-    if (existing) return await toBoardPost(existing);
-    // The archive wrote the image reference into the book store; only the
-    // entry for this post is consumed, so sibling posts sharing the same
-    // asset are unaffected.
-    const [entry] = await transaction
-      .select({ mediaAssetId: bookEntries.mediaAssetId })
-      .from(bookEntries)
-      .where(
-        and(
-          eq(bookEntries.homeId, board.homeId),
-          eq(bookEntries.archivedFromPostId, input.postId),
-        ),
-      )
-      .limit(1);
-    if (!entry) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Archived photo not found.",
-      });
-    }
-    const inserted = await transaction
-      .insert(posts)
-      .values({
-        id: input.postId,
-        boardId: board.id,
-        creatorUserId: user.id,
-        kind: "photo",
-        textContent: null,
-        mediaAssetId: entry.mediaAssetId,
-        positionX: input.x,
-        positionY: input.y,
-        createdAt: input.createdAt,
-      })
-      .onConflictDoNothing()
-      .returning({ id: posts.id });
-    await transaction
-      .delete(bookEntries)
-      .where(
-        and(
-          eq(bookEntries.homeId, board.homeId),
-          eq(bookEntries.archivedFromPostId, input.postId),
-        ),
-      );
-    const [post] = await transaction
-      .select(withMedia(postColumns))
-      .from(posts)
-      .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
-      .where(and(eq(posts.id, input.postId), eq(posts.boardId, board.id)))
-      .limit(1);
-    if (!post) throw new Error("Restored post lookup returned no row.");
-    if (inserted.length > 0) await bumpPostAdditions(transaction, board.id);
-    return await toBoardPost(post);
-  });
+  await requireBoard(user, homeId, boardId);
+  const [entry] = await db
+    .select()
+    .from(bookEntries)
+    .where(
+      and(
+        eq(bookEntries.homeId, homeId),
+        eq(bookEntries.archivedFromPostId, input.postId),
+        isNull(bookEntries.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!entry)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Archived photo not found.",
+    });
+  const postId = randomUUID();
+  ensureAccepted(
+    await applyMediaOperation(user, {
+      kind: "restore-photo",
+      operationId: randomUUID(),
+      homeId,
+      boardId,
+      itemId: postId,
+      archivedItemId: entry.id,
+      expectedRevision: entry.revision,
+      x: input.x,
+      y: input.y,
+    }),
+  );
+  return toBoardPost(await requirePost(user, homeId, postId));
 }
 
 // The single Undo for every post kind. The client's snapshot carries the
@@ -765,4 +650,24 @@ export async function refreshPresence(
   if (!alreadyLive) await publishBoardEvent(board.id, event);
 
   return event;
+}
+
+function ensureAccepted(outcome: NoteOutcome) {
+  if (outcome.code === "ACCEPTED") return;
+  throw new TRPCError({
+    code:
+      outcome.code === "ACCESS_REVOKED"
+        ? "FORBIDDEN"
+        : outcome.code === "DELETE_REQUIRES_CONFIRMATION"
+          ? "CONFLICT"
+          : outcome.code === "ITEM_DELETED"
+            ? "NOT_FOUND"
+            : "BAD_REQUEST",
+    message:
+      outcome.code === "DELETE_REQUIRES_CONFIRMATION"
+        ? "This item changed. Close and reopen it before removing it again."
+        : outcome.code === "INVALID_OPERATION"
+          ? outcome.message
+          : "This change can no longer be applied.",
+  });
 }

@@ -4,7 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**"]
+      "outputs": [".next/**", "dist/**", "renderer/**"]
     },
     "dev": {
       "dependsOn": ["^dev"],
@@ -49,6 +49,9 @@
     "MIGRATION_DATABASE_URL",
     "VERCEL_ENV",
     "POWERSYNC_URL",
+    "NATIVE_API_URL",
+    "NATIVE_RELEASE_API_URL",
+    "NATIVE_RELEASE_POWERSYNC_URL",
     "NOTED_SYNC_TEST_DATABASE_URL",
     "REDIS_URL",
     "FIREBASE_SERVICE_ACCOUNT_KEY_INLINE",

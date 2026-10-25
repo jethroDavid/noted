@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Native SQLite persistence check</title>
+  </head>
+  <body>
+    <h1>Native SQLite persistence check</h1>
+    <p>
+      This isolated fixture never connects to Firebase, PowerSync Cloud, or the
+      backend.
+    </p>
+    <label
+      >Test note <input id="text" value="Persisted without a network" /></label
+    ><button id="save" disabled>Save offline note</button
+    ><button id="switch" disabled>Switch test account</button>
+    <pre id="result" role="status">Opening SQLite…</pre>
+    <script type="module" src="./storage.ts"></script>
+  </body>
+</html>

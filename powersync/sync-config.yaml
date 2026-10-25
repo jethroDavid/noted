@@ -25,3 +25,23 @@ streams:
         )
         AND kind = 'text'
         AND deleted_at IS NULL
+  home_media:
+    queries:
+      - SELECT * FROM posts WHERE kind = 'photo' AND deleted_at IS NULL AND board_id IN (SELECT id FROM boards WHERE home_id = subscription.parameter('home_id') AND home_id IN member_homes)
+      - SELECT * FROM reels WHERE home_id = subscription.parameter('home_id') AND home_id IN member_homes AND deleted_at IS NULL
+      - SELECT * FROM book_entries WHERE home_id = subscription.parameter('home_id') AND home_id IN member_homes AND deleted_at IS NULL AND substring(archived_at, 1, 7) = subscription.parameter('month')
+      - SELECT id, home_id, kind, state, storage_key, content_type, byte_size, thumbnail_key, poster_key FROM media_assets WHERE home_id = subscription.parameter('home_id') AND home_id IN member_homes AND id IN (SELECT media_asset_id FROM posts WHERE deleted_at IS NULL)
+      - SELECT id, home_id, kind, state, storage_key, content_type, byte_size, thumbnail_key, poster_key FROM media_assets WHERE home_id = subscription.parameter('home_id') AND home_id IN member_homes AND id IN (SELECT media_asset_id FROM reels WHERE deleted_at IS NULL)
+      - SELECT id, home_id, kind, state, storage_key, content_type, byte_size, thumbnail_key, poster_key FROM media_assets WHERE home_id = subscription.parameter('home_id') AND home_id IN member_homes AND id IN (SELECT media_asset_id FROM book_entries WHERE deleted_at IS NULL AND substring(archived_at, 1, 7) = subscription.parameter('month'))
+  media_item:
+    queries:
+      - SELECT id, home_id, kind, state, storage_key, content_type, byte_size, thumbnail_key, poster_key FROM media_assets WHERE id = subscription.parameter('asset_id') AND home_id IN member_homes
+      - SELECT * FROM posts WHERE id = subscription.parameter('item_id') AND deleted_at IS NULL AND board_id IN (SELECT id FROM boards WHERE home_id IN member_homes)
+      - SELECT * FROM reels WHERE id = subscription.parameter('item_id') AND home_id IN member_homes AND deleted_at IS NULL
+      - SELECT * FROM book_entries WHERE id = subscription.parameter('item_id') AND home_id IN member_homes AND deleted_at IS NULL
+  note_history:
+    query: |
+      SELECT * FROM note_revisions
+      WHERE post_id = subscription.parameter('post_id')
+        AND substring(created_at, 1, 7) = subscription.parameter('month')
+        AND post_id IN (SELECT id FROM posts WHERE board_id IN (SELECT id FROM boards WHERE home_id IN member_homes))

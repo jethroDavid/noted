@@ -32,6 +32,7 @@
     "@noted/eslint-config": "workspace:*",
     "@noted/prettier-config": "workspace:*",
     "@noted/tsconfig": "workspace:*",
+    "@powersync/service-sync-rules": "0.44.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "catalog:",
     "prettier": "catalog:",

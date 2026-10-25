@@ -153,6 +153,11 @@ export const mediaAssets = pgTable(
     storageKey: text("storage_key").notNull(),
     contentType: text("content_type").notNull(),
     byteSize: integer("byte_size").notNull(),
+    uploaderUserId: uuid("uploader_user_id").references(() => users.id),
+    uploadChecksum: text("upload_checksum"),
+    uploadExpiresAt: timestamp("upload_expires_at", { withTimezone: true }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    cleanupAfter: timestamp("cleanup_after", { withTimezone: true }),
     width: integer("width"),
     height: integer("height"),
     // Worker-written variant keys (null until processed; bundled keys
@@ -241,6 +246,22 @@ export const syncReceipts = pgTable(
   (table) => [primaryKey({ columns: [table.userId, table.operationId] })],
 );
 
+// Durable intent survives a commit followed by a dispatcher/queue outage.
+// A deterministic ID makes recording the same work safe on every retry.
+export const mediaWork = pgTable("media_work", {
+  id: text("id").primaryKey(),
+  homeId: uuid("home_id").notNull(),
+  assetId: uuid("asset_id").notNull(),
+  kind: text("kind").notNull(),
+  keys: jsonb("keys").$type<string[]>().notNull().default([]),
+  attempts: integer("attempts").notNull().default(0),
+  availableAt: timestamp("available_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  lastError: text("last_error"),
+});
+
 export const noteRevisions = pgTable(
   "note_revisions",
   {
@@ -292,6 +313,8 @@ export const reels = pgTable(
         onDelete: "restrict",
         onUpdate: "cascade",
       }),
+    revision: integer("revision").notNull().default(1),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -319,6 +342,8 @@ export const bookEntries = pgTable(
         onDelete: "restrict",
         onUpdate: "cascade",
       }),
+    revision: integer("revision").notNull().default(1),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     // No FK: the source post row is deleted by the archiving transaction.
     archivedFromPostId: uuid("archived_from_post_id"),
     // No FK: the source reel row is deleted by the sweep transaction.

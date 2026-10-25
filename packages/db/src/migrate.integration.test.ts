@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,6 +102,35 @@ describe.skipIf(!testUrl)("serialized deployment migrations", () => {
         .rowCount,
     ).toBe(expectedMigrations);
   }, 20_000);
+
+  it("extends an existing PowerSync publication without exposing server-only tables", async () => {
+    await database.query(
+      "CREATE PUBLICATION powersync FOR TABLE public.users, public.home_memberships, public.homes, public.boards, public.posts",
+    );
+    const sql = await readFile(
+      new URL(
+        "../drizzle/0005_powersync_media_publication.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    await database.query(sql);
+    await database.query(sql); // Safe when an operator already added the tables.
+    const result = await database.query<{ tablename: string }>(
+      "SELECT tablename FROM pg_publication_tables WHERE pubname = 'powersync' AND schemaname = 'public' ORDER BY tablename",
+    );
+    expect(result.rows.map((row) => row.tablename)).toEqual([
+      "boards",
+      "book_entries",
+      "home_memberships",
+      "homes",
+      "media_assets",
+      "note_revisions",
+      "posts",
+      "reels",
+      "users",
+    ]);
+  });
 
   it("rolls back failed SQL and releases the lock so a corrected release can retry", async () => {
     await mkdir(join(directory, "meta"));

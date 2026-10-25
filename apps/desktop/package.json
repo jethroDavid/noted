@@ -1,18 +1,18 @@
 {
   "name": "@noted/desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsc && electron dist/main.js",
+    "dev": "vite build --mode development && tsc && electron dist/main.js",
     "start": "electron dist/main.js",
-    "build": "tsc",
-    "build:installer": "tsc && electron-builder --win",
+    "build": "vite build && tsc",
+    "build:installer": "vite build && tsc && electron-builder --win",
     "assets": "node scripts/generate-icons.mjs",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit --strict --jsx react-jsx --moduleResolution bundler --module esnext --target es2022 --skipLibCheck src/renderer.tsx vite.config.ts"
   },
   "devDependencies": {
     "@noted/eslint-config": "workspace:*",
@@ -23,7 +23,16 @@
     "electron-builder": "^26.15.3",
     "png-to-ico": "^3.0.2",
     "sharp": "^0.35.4",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite": "^8.3.5",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "@noted/native-client": "workspace:*",
+    "@noted/offline": "workspace:*",
+    "@powersync/web": "^2.5.0",
+    "firebase": "catalog:",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
   },
   "prettier": "@noted/prettier-config"
 }

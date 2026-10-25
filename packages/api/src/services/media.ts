@@ -1,6 +1,13 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { bookEntries, db, mediaAssets, posts, reels } from "@noted/db/src";
+import {
+  bookEntries,
+  db,
+  homeMemberships,
+  mediaAssets,
+  posts,
+  reels,
+} from "@noted/db/src";
 import {
   isReelExpired,
   mediaDisplayStatus,
@@ -11,8 +18,8 @@ import {
   deleteUploadBlobs,
   extensionForContentType,
   getObjectBytes,
+  inspectObject,
   isMissingKey,
-  objectExists,
   originalKey,
   posterKey,
   presignPut,
@@ -38,10 +45,16 @@ import type {
 } from "@noted/validators/src";
 import { mediaEventSchema } from "@noted/validators/src";
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, like, lte, not } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, lte, not, sql } from "drizzle-orm";
 import { boardChanged, mediaChanged } from "./events";
 import { findMemberHome, requireMemberHome } from "./homes";
 import type { CurrentUser } from "./identity";
+import { applyMediaOperation } from "./media-sync";
+import {
+  completeMediaWork,
+  dispatchMediaWork,
+  recordMediaWork,
+} from "./media-work";
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -71,11 +84,63 @@ export async function requestUpload(
     storageKey: key,
     contentType: input.contentType,
     byteSize: input.byteSize,
+    uploaderUserId: user.id,
+    uploadChecksum: input.checksum,
+    uploadExpiresAt: new Date(Date.now() + 900_000),
     width: null,
     height: null,
   });
-  const ticket = await presignPut(key, input.contentType, input.byteSize);
+  const ticket = await presignPut(
+    key,
+    input.contentType,
+    input.byteSize,
+    input.checksum,
+  );
   return { assetId, uploadUrl: ticket.url };
+}
+
+export async function cancelUpload(
+  user: CurrentUser,
+  homeId: string,
+  assetId: string,
+) {
+  await db.transaction(async (tx) => {
+    const [member] = await tx
+      .select()
+      .from(homeMemberships)
+      .where(
+        and(
+          eq(homeMemberships.homeId, homeId),
+          eq(homeMemberships.userId, user.id),
+        ),
+      )
+      .for("share");
+    if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+    const [asset] = await tx
+      .select()
+      .from(mediaAssets)
+      .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.homeId, homeId)))
+      .for("update");
+    if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+    if (asset.uploaderUserId !== user.id)
+      throw new TRPCError({ code: "FORBIDDEN" });
+    if (asset.state === "attached")
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This original was already accepted.",
+      });
+    if (asset.state === "expired") return;
+    await tx
+      .update(posts)
+      .set({ deletedAt: new Date(), revision: sql`${posts.revision} + 1` })
+      .where(and(eq(posts.mediaAssetId, asset.id), isNull(posts.deletedAt)));
+    await tx
+      .update(reels)
+      .set({ deletedAt: new Date(), revision: sql`${reels.revision} + 1` })
+      .where(and(eq(reels.mediaAssetId, asset.id), isNull(reels.deletedAt)));
+    await deleteAssetIfOrphaned(tx, asset.id);
+  });
+  return { assetId };
 }
 
 // One attach per asset: the row must be pending, home-owned,
@@ -83,46 +148,42 @@ export async function requestUpload(
 // checked here — the post is created instantly and the browser PUTs in the
 // background; confirmUpload verifies the bytes landed.
 export async function requirePendingUpload(
+  user: CurrentUser,
   homeId: string,
   assetId: string,
   kind: "photo" | "video",
+  tx: Transaction,
 ) {
-  const [asset] = await db
+  const [member] = await tx
+    .select()
+    .from(homeMemberships)
+    .where(
+      and(
+        eq(homeMemberships.homeId, homeId),
+        eq(homeMemberships.userId, user.id),
+      ),
+    )
+    .for("share");
+  if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+  const [asset] = await tx
     .select()
     .from(mediaAssets)
-    .where(eq(mediaAssets.id, assetId))
-    .limit(1);
-  if (!asset || asset.homeId !== homeId) {
+    .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.homeId, homeId)))
+    .for("update");
+  if (!asset)
     throw new TRPCError({ code: "NOT_FOUND", message: "Upload not found." });
-  }
-  if (asset.kind !== kind) {
+  if (asset.kind !== kind)
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `This upload is a ${asset.kind}, not a ${kind}.`,
+      message: "Upload kind does not match.",
     });
-  }
-  if (asset.state !== "pending") {
+  if (asset.uploaderUserId !== user.id)
+    throw new TRPCError({ code: "FORBIDDEN" });
+  if (asset.state === "expired" || asset.cleanupAfter)
     throw new TRPCError({
       code: "CONFLICT",
-      message: "This upload is already attached.",
+      message: "This upload was canceled.",
     });
-  }
-  const [postRef] = await db
-    .select({ id: posts.id })
-    .from(posts)
-    .where(eq(posts.mediaAssetId, asset.id))
-    .limit(1);
-  const [reelRef] = await db
-    .select({ id: reels.id })
-    .from(reels)
-    .where(eq(reels.mediaAssetId, asset.id))
-    .limit(1);
-  if (postRef ?? reelRef) {
-    throw new TRPCError({
-      code: "CONFLICT",
-      message: "This upload is already attached.",
-    });
-  }
   return asset;
 }
 
@@ -137,58 +198,56 @@ export async function confirmUpload(
   homeId: string,
   assetId: string,
 ): Promise<{ assetId: string }> {
-  const home = await requireMemberHome(user, homeId);
-  const [asset] = await db
-    .select()
-    .from(mediaAssets)
-    .where(eq(mediaAssets.id, assetId))
-    .limit(1);
-  if (!asset || asset.homeId !== home.id) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Upload not found." });
-  }
-  if (asset.state === "attached") {
-    const variantKey =
-      asset.kind === "photo" ? asset.thumbnailKey : asset.posterKey;
-    const status = mediaDisplayStatus({
-      state: asset.state,
-      storageKey: asset.storageKey,
-      variantKey,
-    });
-    if (status === "processing") {
-      await publishJob({
-        job: "process-media",
-        homeId: home.id,
-        assetId: asset.id,
+  await db.transaction(async (tx) => {
+    const [member] = await tx
+      .select()
+      .from(homeMemberships)
+      .where(
+        and(
+          eq(homeMemberships.homeId, homeId),
+          eq(homeMemberships.userId, user.id),
+        ),
+      )
+      .for("share");
+    if (!member) throw new TRPCError({ code: "FORBIDDEN" });
+    const [asset] = await tx
+      .select()
+      .from(mediaAssets)
+      .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.homeId, homeId)))
+      .for("update");
+    if (!asset) throw new TRPCError({ code: "NOT_FOUND" });
+    if (asset.uploaderUserId && asset.uploaderUserId !== user.id)
+      throw new TRPCError({ code: "FORBIDDEN" });
+    if (asset.state === "expired" || asset.cleanupAfter)
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This upload was canceled.",
       });
+    if (asset.state === "pending") {
+      const object = await inspectObject(asset.storageKey);
+      if (
+        !object ||
+        object.byteSize !== asset.byteSize ||
+        object.contentType !== asset.contentType
+      )
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Upload bytes do not match the reservation.",
+        });
+      await tx
+        .update(mediaAssets)
+        .set({ state: "attached", verifiedAt: new Date() })
+        .where(eq(mediaAssets.id, asset.id));
     }
-    return { assetId: asset.id };
-  }
-  if (asset.state !== "pending") {
-    throw new TRPCError({
-      code: "CONFLICT",
-      message: "This upload has expired.",
-    });
-  }
-  if (!(await objectExists(asset.storageKey))) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Upload bytes not found — retry the upload.",
-    });
-  }
-  await db
-    .update(mediaAssets)
-    .set({ state: "attached" })
-    .where(eq(mediaAssets.id, asset.id));
-  await publishJob({
-    job: "process-media",
-    homeId: home.id,
-    assetId: asset.id,
+    if (asset.kind === "photo" ? !asset.thumbnailKey : asset.posterKey === null)
+      await recordMediaWork(tx, { kind: "process-media", homeId, assetId });
   });
-  return { assetId: asset.id };
+  void dispatchMediaWork().catch(() => {});
+  return { assetId };
 }
 
 async function toReel(
-  reel: { id: string; homeId: string; createdAt: Date },
+  reel: { id: string; homeId: string; createdAt: Date; revision?: number },
   asset: {
     state: string;
     storageKey: string;
@@ -208,6 +267,7 @@ async function toReel(
   if (status !== "ready") {
     return {
       id: reel.id,
+      revision: reel.revision ?? 1,
       homeId: reel.homeId,
       status,
       videoUrl: null,
@@ -218,6 +278,7 @@ async function toReel(
   }
   return {
     id: reel.id,
+    revision: reel.revision ?? 1,
     homeId: reel.homeId,
     status,
     videoUrl: await viewUrl(asset.storageKey),
@@ -235,22 +296,34 @@ export async function createReel(
   homeId: string,
   input: CreateReelInput,
 ): Promise<Reel> {
-  const home = await requireMemberHome(user, homeId);
-  const asset = await requirePendingUpload(home.id, input.assetId, "video");
-  const reel = await db.transaction(async (transaction) => {
-    const [inserted] = await transaction
+  const result = await db.transaction(async (tx) => {
+    const asset = await requirePendingUpload(
+      user,
+      homeId,
+      input.assetId,
+      "video",
+      tx,
+    );
+    const [existing] = await tx
+      .select()
+      .from(reels)
+      .where(eq(reels.mediaAssetId, asset.id))
+      .limit(1);
+    if (existing) return { reel: existing, asset };
+    if (asset.state !== "pending")
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "Original already accepted without this attachment.",
+      });
+    const [reel] = await tx
       .insert(reels)
-      .values({
-        homeId: home.id,
-        mediaAssetId: asset.id,
-        creatorUserId: user.id,
-      })
+      .values({ homeId, mediaAssetId: asset.id, creatorUserId: user.id })
       .returning();
-    if (!inserted) throw new Error("Reel insert returned no row.");
-    return inserted;
+    if (!reel) throw Error("Reel insert returned no row.");
+    return { reel, asset };
   });
-  await mediaChanged(home.id);
-  return toReel(reel, asset);
+  await mediaChanged(homeId);
+  return toReel(result.reel, result.asset);
 }
 
 export async function listReels(
@@ -261,6 +334,7 @@ export async function listReels(
   const rows = await db
     .select({
       id: reels.id,
+      revision: reels.revision,
       homeId: reels.homeId,
       createdAt: reels.createdAt,
       state: mediaAssets.state,
@@ -269,7 +343,7 @@ export async function listReels(
     })
     .from(reels)
     .innerJoin(mediaAssets, eq(reels.mediaAssetId, mediaAssets.id))
-    .where(eq(reels.homeId, home.id))
+    .where(and(eq(reels.homeId, home.id), isNull(reels.deletedAt)))
     .orderBy(desc(reels.createdAt), desc(reels.id));
   return { reels: await Promise.all(rows.map((row) => toReel(row, row))) };
 }
@@ -282,6 +356,7 @@ export async function listBook(
   const rows = await db
     .select({
       id: bookEntries.id,
+      revision: bookEntries.revision,
       archivedAt: bookEntries.archivedAt,
       kind: mediaAssets.kind,
       storageKey: mediaAssets.storageKey,
@@ -290,7 +365,7 @@ export async function listBook(
     })
     .from(bookEntries)
     .innerJoin(mediaAssets, eq(bookEntries.mediaAssetId, mediaAssets.id))
-    .where(eq(bookEntries.homeId, home.id))
+    .where(and(eq(bookEntries.homeId, home.id), isNull(bookEntries.deletedAt)))
     // Oldest first: like a physical photobook, new entries append at the
     // back instead of jumping the front.
     .orderBy(asc(bookEntries.archivedAt), asc(bookEntries.id));
@@ -302,6 +377,7 @@ export async function listBook(
           return {
             kind: "photo" as const,
             id: row.id,
+            revision: row.revision,
             thumbnailUrl: row.thumbnailKey
               ? await viewUrl(row.thumbnailKey)
               : imageUrl,
@@ -340,17 +416,19 @@ export async function deleteAssetIfOrphaned(
   const [postRef] = await transaction
     .select({ id: posts.id })
     .from(posts)
-    .where(eq(posts.mediaAssetId, assetId))
+    .where(and(eq(posts.mediaAssetId, assetId), isNull(posts.deletedAt)))
     .limit(1);
   const [reelRef] = await transaction
     .select({ id: reels.id })
     .from(reels)
-    .where(eq(reels.mediaAssetId, assetId))
+    .where(and(eq(reels.mediaAssetId, assetId), isNull(reels.deletedAt)))
     .limit(1);
   const [bookRef] = await transaction
     .select({ id: bookEntries.id })
     .from(bookEntries)
-    .where(eq(bookEntries.mediaAssetId, assetId))
+    .where(
+      and(eq(bookEntries.mediaAssetId, assetId), isNull(bookEntries.deletedAt)),
+    )
     .limit(1);
   if (postRef ?? reelRef ?? bookRef) return [];
   const [asset] = await transaction
@@ -359,12 +437,30 @@ export async function deleteAssetIfOrphaned(
     .where(eq(mediaAssets.id, assetId))
     .limit(1);
   if (!asset) return [];
-  await transaction.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
+  const after = new Date(
+    Math.max(
+      Date.now() + 30 * 60_000,
+      (asset.uploadExpiresAt?.getTime() ?? 0) + 30 * 60_000,
+    ),
+  );
+  await transaction
+    .update(mediaAssets)
+    .set({ state: "expired", cleanupAfter: after })
+    .where(eq(mediaAssets.id, assetId));
   // Empty keys (the posterless-reel marker) delete nothing and would fail
   // the cleanup payload's min(1) keys, so they never leave this filter.
-  return [asset.storageKey, asset.thumbnailKey, asset.posterKey].filter(
+  const keys = [asset.storageKey, asset.thumbnailKey, asset.posterKey].filter(
     (key): key is string => key !== null && key.length > 0,
   );
+  await recordMediaWork(transaction, {
+    kind: "cleanup-media",
+    homeId: asset.homeId,
+    assetId,
+    keys,
+    availableAt: after,
+  });
+  // The durable dispatcher owns the delayed publication.
+  return [];
 }
 
 interface ReelRemoval {
@@ -385,8 +481,9 @@ async function removeReelRow(
   archivedByUserId: string,
 ): Promise<ReelRemoval> {
   const deleted = await transaction
-    .delete(reels)
-    .where(eq(reels.id, reel.id))
+    .update(reels)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(reels.id, reel.id), isNull(reels.deletedAt)))
     .returning({ id: reels.id });
   if (deleted.length === 0)
     return { removed: false, archived: false, keys: [] };
@@ -397,14 +494,7 @@ async function removeReelRow(
     .from(mediaAssets)
     .where(eq(mediaAssets.id, reel.mediaAssetId))
     .limit(1);
-  const status = asset
-    ? mediaDisplayStatus({
-        state: asset.state,
-        storageKey: asset.storageKey,
-        variantKey: asset.posterKey,
-      })
-    : "uploading";
-  if (status === "ready") {
+  if (asset?.state === "attached") {
     await transaction.insert(bookEntries).values({
       homeId: reel.homeId,
       mediaAssetId: reel.mediaAssetId,
@@ -420,80 +510,67 @@ async function removeReelRow(
 export async function deleteReel(
   user: CurrentUser,
   homeId: string,
-  input: { reelId: string },
+  input: { reelId: string; expectedRevision?: number; operationId?: string },
 ): Promise<{ reelId: string }> {
-  const home = await requireMemberHome(user, homeId);
-  const [reel] = await db
-    .select({ id: reels.id, mediaAssetId: reels.mediaAssetId })
+  await requireMemberHome(user, homeId);
+  const [row] = await db
+    .select()
     .from(reels)
-    .where(and(eq(reels.id, input.reelId), eq(reels.homeId, home.id)))
-    .limit(1);
-  if (!reel) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Reel not found." });
-  }
-  const outcome = await db.transaction(async (transaction) =>
-    removeReelRow(
-      transaction,
-      { id: reel.id, homeId: home.id, mediaAssetId: reel.mediaAssetId },
-      user.id,
-    ),
-  );
-  // The pre-check found the row, so a missing removal means a concurrent
-  // delete won the race: report NOT_FOUND like the row was never there.
-  if (!outcome.removed) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Reel not found." });
-  }
-  await mediaChanged(home.id);
-  if (outcome.keys.length > 0) {
-    await publishJob({
-      job: "cleanup-media",
-      homeId: home.id,
-      assetId: reel.mediaAssetId,
-      keys: outcome.keys,
+    .where(and(eq(reels.id, input.reelId), eq(reels.homeId, homeId)));
+  if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+  const result = await applyMediaOperation(user, {
+    kind: "archive-video",
+    operationId: input.operationId ?? randomUUID(),
+    homeId,
+    itemId: row.id,
+    expectedRevision: input.expectedRevision ?? row.revision,
+  });
+  if (result.code !== "ACCEPTED")
+    throw new TRPCError({
+      code:
+        result.code === "DELETE_REQUIRES_CONFIRMATION"
+          ? "CONFLICT"
+          : result.code === "ACCESS_REVOKED"
+            ? "FORBIDDEN"
+            : "BAD_REQUEST",
+      message: "This item changed. Review it before removing it again.",
     });
-  }
-  return { reelId: reel.id };
+  return { reelId: row.id };
 }
 
 export async function deleteBookEntry(
   user: CurrentUser,
   homeId: string,
-  input: { entryId: string },
+  input: { entryId: string; expectedRevision?: number; operationId?: string },
 ): Promise<{ entryId: string }> {
-  const home = await requireMemberHome(user, homeId);
-  const [entry] = await db
-    .select({ id: bookEntries.id, mediaAssetId: bookEntries.mediaAssetId })
+  await requireMemberHome(user, homeId);
+  const [row] = await db
+    .select()
     .from(bookEntries)
     .where(
-      and(eq(bookEntries.id, input.entryId), eq(bookEntries.homeId, home.id)),
-    )
-    .limit(1);
-  if (!entry) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Book entry not found.",
-    });
-  }
-  const keys = await db.transaction(async (transaction) => {
-    await transaction.delete(bookEntries).where(eq(bookEntries.id, entry.id));
-    return deleteAssetIfOrphaned(transaction, entry.mediaAssetId);
+      and(eq(bookEntries.id, input.entryId), eq(bookEntries.homeId, homeId)),
+    );
+  if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+  const result = await applyMediaOperation(user, {
+    kind: "delete-book",
+    operationId: input.operationId ?? randomUUID(),
+    homeId,
+    itemId: row.id,
+    expectedRevision: input.expectedRevision ?? row.revision,
   });
-  await mediaChanged(home.id);
-  if (keys.length > 0) {
-    await publishJob({
-      job: "cleanup-media",
-      homeId: home.id,
-      assetId: entry.mediaAssetId,
-      keys,
+  if (result.code !== "ACCEPTED")
+    throw new TRPCError({
+      code:
+        result.code === "DELETE_REQUIRES_CONFIRMATION"
+          ? "CONFLICT"
+          : result.code === "ACCESS_REVOKED"
+            ? "FORBIDDEN"
+            : "BAD_REQUEST",
+      message: "This item changed. Review it before removing it again.",
     });
-  }
-  return { entryId: entry.id };
+  return { entryId: row.id };
 }
 
-// The home's media stream: yields validated room events, rechecking
-// membership before each one so a revoked member's stream ends at the next
-// event instead of leaking further updates. Clients refetch onStarted, so
-// no initial yield is needed (unlike presence, there is nothing to join).
 export async function* watchHome(
   user: CurrentUser,
   homeId: string,
@@ -553,7 +630,25 @@ const NO_POSTER_KEY = "";
 // original, reels play without a poster) so nothing strands a spinner;
 // transient S3 failures throw for a retry; a deleted source stops quietly.
 export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
-  const [asset] = await db
+  await db.transaction(async (transaction) => {
+    const [locked] = await transaction
+      .select()
+      .from(mediaAssets)
+      .where(
+        and(
+          eq(mediaAssets.id, job.assetId),
+          eq(mediaAssets.homeId, job.homeId),
+        ),
+      )
+      .for("update");
+    if (!locked || locked.state !== "attached") return;
+    await processMedia(job, transaction);
+  });
+  await completeMediaWork("process-media", job.assetId, job.workId);
+}
+
+async function processMedia(job: ProcessMediaJob, database: Transaction) {
+  const [asset] = await database
     .select()
     .from(mediaAssets)
     .where(eq(mediaAssets.id, job.assetId))
@@ -567,10 +662,8 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
     original = await getObjectBytes(asset.storageKey);
   } catch (error) {
     if (isMissingKey(error)) {
-      console.error(
-        `Skipping process-media: source blob is gone (${asset.storageKey}).`,
-      );
-      return;
+      console.error(`Original missing for accepted asset ${asset.id}.`);
+      throw new Error("ACCEPTED_ORIGINAL_MISSING");
     }
     throw error;
   }
@@ -588,7 +681,7 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
           `Serving original for asset ${asset.id} (thumbnail failed):`,
           error,
         );
-        await db
+        await database
           .update(mediaAssets)
           .set({ thumbnailKey: asset.storageKey })
           .where(eq(mediaAssets.id, asset.id));
@@ -596,7 +689,7 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
       }
       const key = thumbnailKey(asset.homeId, asset.id);
       await putObjectBytes(key, thumbnail.bytes, "image/jpeg");
-      await db
+      await database
         .update(mediaAssets)
         .set({
           thumbnailKey: key,
@@ -618,7 +711,7 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
           `Serving asset ${asset.id} without a poster (poster failed):`,
           error,
         );
-        await db
+        await database
           .update(mediaAssets)
           .set({ posterKey: NO_POSTER_KEY })
           .where(eq(mediaAssets.id, asset.id));
@@ -626,7 +719,7 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
       }
       const key = posterKey(asset.homeId, asset.id);
       await putObjectBytes(key, poster, "image/jpeg");
-      await db
+      await database
         .update(mediaAssets)
         .set({ posterKey: key })
         .where(eq(mediaAssets.id, asset.id));
@@ -638,13 +731,13 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
   // Completion events, resolved by lookup (not payload ids) so retries
   // stay idempotent: the board swaps originals for thumbnails, TV picks
   // up posters. Attachments deleted mid-flight simply skip their event.
-  const [post] = await db
+  const [post] = await database
     .select({ boardId: posts.boardId })
     .from(posts)
     .where(eq(posts.mediaAssetId, asset.id))
     .limit(1);
   if (post) await boardChanged(post.boardId);
-  const [reel] = await db
+  const [reel] = await database
     .select({ id: reels.id })
     .from(reels)
     .where(eq(reels.mediaAssetId, asset.id))
@@ -654,11 +747,67 @@ export async function handleProcessMedia(job: ProcessMediaJob): Promise<void> {
 
 // Removes orphaned blobs by key. Fixture keys are skipped inside the media
 // package (never deleted); partial failures throw for a QStash retry.
-export async function handleCleanupMedia(job: CleanupMediaJob): Promise<void> {
-  const outcome = await deleteUploadBlobs(job.keys);
-  console.log(
-    `Cleaned up asset ${job.assetId}: ${outcome.deleted.length} blob(s) deleted, ${outcome.skipped.length} skipped.`,
-  );
+export async function handleCleanupMedia(
+  job: CleanupMediaJob,
+  database: typeof db = db,
+): Promise<void> {
+  const completed = await database.transaction(async (tx) => {
+    const [asset] = await tx
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.id, job.assetId))
+      .for("update");
+    if (!asset) {
+      // A signed job is still only intent: without canonical ownership we
+      // cannot safely delete keys supplied in its payload.
+      console.warn(
+        `Cleanup skipped: asset ${job.assetId} has no canonical record.`,
+      );
+      return true;
+    }
+    if (asset.homeId !== job.homeId)
+      throw new Error("Cleanup asset scope mismatch.");
+    if (!asset.cleanupAfter || asset.cleanupAfter > new Date()) return false;
+    const [post] = await tx
+      .select({ id: posts.id })
+      .from(posts)
+      .where(and(eq(posts.mediaAssetId, asset.id), isNull(posts.deletedAt)))
+      .limit(1);
+    const [reel] = await tx
+      .select({ id: reels.id })
+      .from(reels)
+      .where(and(eq(reels.mediaAssetId, asset.id), isNull(reels.deletedAt)))
+      .limit(1);
+    const [entry] = await tx
+      .select({ id: bookEntries.id })
+      .from(bookEntries)
+      .where(
+        and(
+          eq(bookEntries.mediaAssetId, asset.id),
+          isNull(bookEntries.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (post || reel || entry) {
+      await tx
+        .update(mediaAssets)
+        .set({ cleanupAfter: null })
+        .where(eq(mediaAssets.id, asset.id));
+      return true;
+    }
+    await deleteUploadBlobs(
+      [asset.storageKey, asset.thumbnailKey, asset.posterKey].filter(
+        (key): key is string => Boolean(key),
+      ),
+    );
+    await tx
+      .update(mediaAssets)
+      .set({ state: "expired" })
+      .where(eq(mediaAssets.id, asset.id));
+    return true;
+  });
+  if (completed)
+    await completeMediaWork("cleanup-media", job.assetId, job.workId, database);
 }
 
 // Reels swept per scheduled run. The job is cheap to repeat (a re-run finds
@@ -687,6 +836,8 @@ export async function handleSweepReels(_job: SweepReelsJob): Promise<void> {
     .where(
       and(
         lte(reels.createdAt, new Date(now.getTime() - REEL_LIFETIME_MS)),
+        isNull(reels.deletedAt),
+        eq(mediaAssets.state, "attached"),
         not(like(mediaAssets.storageKey, "fixtures/%")),
       ),
     )

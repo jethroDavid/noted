@@ -74,7 +74,11 @@ export async function verifyIdToken(
   if (
     !decoded.email ||
     decoded.email_verified !== true ||
-    decoded.firebase.sign_in_provider !== "google.com"
+    !(
+      decoded.firebase.sign_in_provider === "google.com" ||
+      (decoded.firebase.sign_in_provider === "custom" &&
+        decoded.native_session === true)
+    )
   ) {
     throw new AuthError("FORBIDDEN", "A verified Google account is required.");
   }
@@ -84,4 +88,21 @@ export async function verifyIdToken(
     email: decoded.email.trim().toLowerCase(),
     displayName: typeof decoded.name === "string" ? decoded.name : null,
   };
+}
+
+// Only the authenticated browser handoff can issue this marked token.
+// Re-check the actual Firebase account; a UID alone is insufficient.
+export async function createNativeSignInToken(
+  subject: string,
+): Promise<string> {
+  const auth = adminAuth();
+  const user = await auth.getUser(subject);
+  if (
+    user.disabled ||
+    !user.emailVerified ||
+    !user.providerData.some((provider) => provider.providerId === "google.com")
+  ) {
+    throw new AuthError("FORBIDDEN", "A verified Google account is required.");
+  }
+  return auth.createCustomToken(subject, { native_session: true });
 }

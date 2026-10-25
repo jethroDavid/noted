@@ -15,6 +15,7 @@ coverage/
 # Env and secrets (never commit; Phase 0 adds .env.example)
 .env
 .env.*
+noted.env
 !.env.example
 
 # Local-only state (Firebase creds, scratch)
@@ -42,6 +43,7 @@ apps/mobile/android/app/src/main/assets/
 
 # Electron installer output (unsigned NSIS builds, regenerated on demand)
 apps/desktop/release/
+apps/desktop/renderer/
 
 # OS and editor
 .DS_Store

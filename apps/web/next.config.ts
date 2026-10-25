@@ -24,6 +24,7 @@ const config: NextConfig = {
     "@noted/queue",
     "@noted/realtime",
     "@noted/ui",
+    "@noted/experience",
     "@noted/validators",
   ],
 };

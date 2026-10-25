@@ -1,4 +1,8 @@
 {
   "extends": "@noted/tsconfig/base.json",
-  "include": ["capacitor.config.ts"]
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["capacitor.config.ts", "vite.config.ts", "src"]
 }

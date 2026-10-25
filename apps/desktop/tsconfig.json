@@ -9,5 +9,5 @@
     "declaration": false,
     "declarationMap": false
   },
-  "include": ["src"]
+  "include": ["src/main.ts", "src/navigation.ts", "src/navigation.test.ts"]
 }

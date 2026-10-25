@@ -14,6 +14,7 @@ describe("upload requests", () => {
     expect(
       requestUploadSchema.safeParse({
         homeId: HOME_ID,
+        checksum: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         kind: "photo",
         contentType: "image/jpeg",
         byteSize: 1024,
@@ -22,6 +23,7 @@ describe("upload requests", () => {
     expect(
       requestUploadSchema.safeParse({
         homeId: HOME_ID,
+        checksum: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         kind: "video",
         contentType: "video/mp4",
         byteSize: 1024,
@@ -32,6 +34,7 @@ describe("upload requests", () => {
   it("rejects content types outside the kind allowlist", () => {
     const parsed = requestUploadSchema.safeParse({
       homeId: HOME_ID,
+      checksum: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
       kind: "photo",
       contentType: "video/mp4",
       byteSize: 1024,
@@ -43,6 +46,7 @@ describe("upload requests", () => {
     expect(
       requestUploadSchema.safeParse({
         homeId: HOME_ID,
+        checksum: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         kind: "photo",
         contentType: "image/jpeg",
         byteSize: UPLOAD_RULES.photo.maxBytes + 1,
@@ -51,6 +55,7 @@ describe("upload requests", () => {
     expect(
       requestUploadSchema.safeParse({
         homeId: HOME_ID,
+        checksum: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         kind: "video",
         contentType: "video/mp4",
         byteSize: 0,

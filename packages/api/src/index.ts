@@ -7,3 +7,4 @@ export {
   handleSweepReels,
 } from "./services/media";
 export { createContext, type Context } from "./trpc";
+export { reconcileMediaWork } from "./services/media-work";

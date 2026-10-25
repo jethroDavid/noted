@@ -1,6 +1,7 @@
 "use client";
 
 import type { AppRouter } from "@noted/api/src";
+import { TRPCProvider, useTRPC } from "@noted/experience/src";
 import {
   notifyManager,
   QueryClient,
@@ -12,7 +13,6 @@ import {
   httpSubscriptionLink,
   splitLink,
 } from "@trpc/client";
-import { createTRPCContext } from "@trpc/tanstack-react-query";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import superjson from "superjson";
@@ -20,8 +20,6 @@ import {
   isFirebaseConfigured,
   webAuth,
 } from "../platform/auth/firebase-client";
-
-const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
 export { useTRPC };
 

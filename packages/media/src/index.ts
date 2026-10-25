@@ -14,6 +14,7 @@ export {
   ensureBucket,
   getObjectBytes,
   isMissingKey,
+  inspectObject,
   objectExists,
   presignGet,
   presignPut,

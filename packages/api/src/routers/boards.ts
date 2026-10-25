@@ -12,6 +12,7 @@ import {
   updatePostContentSchema,
   updatePostPositionSchema,
 } from "@noted/validators/src";
+import { noteHistorySchema } from "@noted/validators/sync";
 import { z } from "zod";
 import {
   createTextPost,
@@ -24,12 +25,27 @@ import {
   restoreAnyPost,
   watchBoard,
 } from "../services/posts";
+import { readNoteHistory } from "../services/sync";
 import { protectedProcedure, router } from "../trpc";
 
 const boardInput = z.object({ homeId: homeIdSchema, boardId: boardIdSchema });
 const postInput = z.object({ homeId: homeIdSchema, postId: postIdSchema });
 
 export const boardsRouter = router({
+  history: protectedProcedure
+    .input(
+      postInput.extend({
+        month: z
+          .string()
+          .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
+          .optional(),
+        beforeRevision: z.number().int().positive().optional(),
+      }),
+    )
+    .output(noteHistorySchema)
+    .query(({ ctx, input }) =>
+      readNoteHistory(ctx.user, input.homeId, input.postId, input),
+    ),
   get: protectedProcedure
     .input(boardInput)
     .output(boardPostsResponseSchema)
@@ -38,16 +54,27 @@ export const boardsRouter = router({
     ),
 
   createText: protectedProcedure
-    .input(boardInput.extend(createTextPostSchema.shape))
+    .input(
+      boardInput.extend(createTextPostSchema.shape).extend({
+        operationId: z.uuid().optional(),
+        postId: z.uuid().optional(),
+      }),
+    )
     .output(boardPostSchema)
     .mutation(async ({ ctx, input }) =>
-      createTextPost(ctx.user, input.homeId, input.boardId, {
-        text: input.text,
-        foregroundColor: input.foregroundColor,
-        backgroundColor: input.backgroundColor,
-        x: input.x,
-        y: input.y,
-      }),
+      createTextPost(
+        ctx.user,
+        input.homeId,
+        input.boardId,
+        {
+          text: input.text,
+          foregroundColor: input.foregroundColor,
+          backgroundColor: input.backgroundColor,
+          x: input.x,
+          y: input.y,
+        },
+        input,
+      ),
     ),
 
   createUploadedPhoto: protectedProcedure
@@ -62,31 +89,62 @@ export const boardsRouter = router({
     ),
 
   editContent: protectedProcedure
-    .input(postInput.extend(updatePostContentSchema.shape))
+    .input(
+      postInput
+        .extend(updatePostContentSchema.shape)
+        .extend({ operationId: z.uuid().optional() }),
+    )
     .output(boardPostSchema)
     .mutation(async ({ ctx, input }) =>
-      editPostContent(ctx.user, input.homeId, input.postId, {
-        text: input.text,
-        foregroundColor: input.foregroundColor,
-        backgroundColor: input.backgroundColor,
-      }),
+      editPostContent(
+        ctx.user,
+        input.homeId,
+        input.postId,
+        {
+          text: input.text,
+          foregroundColor: input.foregroundColor,
+          backgroundColor: input.backgroundColor,
+        },
+        input.operationId,
+      ),
     ),
 
   move: protectedProcedure
-    .input(postInput.extend(updatePostPositionSchema.shape))
+    .input(
+      postInput
+        .extend(updatePostPositionSchema.shape)
+        .extend({ operationId: z.uuid().optional() }),
+    )
     .output(boardPostSchema)
     .mutation(async ({ ctx, input }) =>
-      movePost(ctx.user, input.homeId, input.postId, {
-        x: input.x,
-        y: input.y,
-      }),
+      movePost(
+        ctx.user,
+        input.homeId,
+        input.postId,
+        {
+          x: input.x,
+          y: input.y,
+        },
+        input.operationId,
+      ),
     ),
 
   removePost: protectedProcedure
-    .input(postInput)
+    .input(
+      postInput.extend({
+        expectedRevision: z.number().int().positive().optional(),
+        operationId: z.uuid().optional(),
+      }),
+    )
     .output(z.object({ postId: postIdSchema }))
     .mutation(async ({ ctx, input }) =>
-      removePost(ctx.user, input.homeId, input.postId),
+      removePost(
+        ctx.user,
+        input.homeId,
+        input.postId,
+        input.expectedRevision,
+        input.operationId,
+      ),
     ),
 
   restorePost: protectedProcedure

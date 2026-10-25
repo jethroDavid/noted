@@ -75,6 +75,9 @@ describe("durable PowerSync note operations", { timeout: 20_000 }, () => {
     const transaction = await reopened.getNextCrudTransaction();
     expect(transaction?.crud).toHaveLength(1);
     expect(JSON.parse(transaction!.crud[0]!.metadata!)).toEqual(operation);
+    expect(
+      await reopened.getAll("SELECT id, post_id FROM note_pending"),
+    ).toEqual([{ id: operation.operationId, post_id: operation.postId }]);
   });
 
   it("queues only the fields the edit changes and cannot overwrite a duplicate local ID", async () => {
@@ -123,9 +126,13 @@ describe("durable PowerSync note operations", { timeout: 20_000 }, () => {
       "Lost response",
     );
     expect((await database.getUploadQueueStats()).count).toBe(1);
+    expect(await database.getAll("SELECT id FROM note_pending")).toEqual([
+      { id: operation.operationId },
+    ]);
     await connector.uploadData!(database);
     expect(delivered).toEqual([operation, operation]);
     expect((await database.getUploadQueueStats()).count).toBe(0);
+    expect(await database.getAll("SELECT id FROM note_pending")).toEqual([]);
   });
 
   it("persists rejected text before completing the queue, including across restart", async () => {

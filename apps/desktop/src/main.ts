@@ -1,5 +1,35 @@
-import { app, BrowserWindow } from "electron";
-import { resolveStartUrl } from "./start-url.js";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { app, BrowserWindow, net, protocol, shell } from "electron";
+import { isSignInNavigation, rendererAsset } from "./navigation.js";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "noted",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on("second-instance", () => {
+  const window = BrowserWindow.getAllWindows()[0];
+  if (window?.isMinimized()) window.restore();
+  window?.focus();
+});
+
+const rendererDirectory = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../renderer",
+);
+const { apiUrl } = JSON.parse(
+  readFileSync(resolve(rendererDirectory, "native-config.json"), "utf8"),
+) as { apiUrl: string };
 
 async function createWindow(): Promise<void> {
   const window = new BrowserWindow({
@@ -8,20 +38,32 @@ async function createWindow(): Promise<void> {
     minWidth: 1024,
     minHeight: 640,
     title: "Noted",
-    // Defaults stay locked down (context isolation on, Node integration
-    // off): the window only renders the remote app, like the mobile
-    // webview. No preload until a native API needs exposing.
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
-  await window.loadURL(
-    resolveStartUrl({
-      packaged: app.isPackaged,
-      appUrl: process.env.APP_URL,
-      port: process.env.PORT,
-    }),
-  );
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSignInNavigation(url, apiUrl)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  window.webContents.on("will-navigate", (event, url) => {
+    const target = new URL(url);
+    if (target.protocol !== "noted:" || target.hostname !== "app")
+      event.preventDefault();
+  });
+  await window.loadURL("noted://app/index.html");
 }
 
-void app.whenReady().then(createWindow);
+void app.whenReady().then(async () => {
+  if (!primaryInstance) return;
+  protocol.handle("noted", (request) => {
+    const asset = rendererAsset(rendererDirectory, request.url);
+    return asset ? net.fetch(asset) : new Response(null, { status: 404 });
+  });
+  await createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

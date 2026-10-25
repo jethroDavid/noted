@@ -1,0 +1,48 @@
+{
+  "name": "@noted/experience",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./src": "./src/index.ts",
+    "./styles.css": "./src/styles.css",
+    "./platform/auth/auth-provider": "./src/platform/auth/auth-provider.tsx",
+    "./platform/device": "./src/platform/device.ts",
+    "./platform/capture/capture": "./src/platform/capture/capture.ts",
+    "./features/motion/use-paper-motion": "./src/features/motion/use-paper-motion.ts",
+    "./features/board/board-view": "./src/features/board/board-view.tsx",
+    "./features/board/members-panel": "./src/features/board/members-panel.tsx",
+    "./features/book/book-view": "./src/features/book/book-view.tsx",
+    "./features/tv/reels-view": "./src/features/tv/reels-view.tsx",
+    "./features/sound/home-sound": "./src/features/sound/home-sound.tsx"
+  },
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/camera": "^8.2.5",
+    "@gsap/react": "^2.1.2",
+    "@noted/api": "workspace:*",
+    "@noted/ui": "workspace:*",
+    "@noted/validators": "workspace:*",
+    "@noted/domain": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/tanstack-react-query": "catalog:",
+    "firebase": "catalog:",
+    "gsap": "^3.15.0",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
+  },
+  "devDependencies": {
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  },
+  "prettier": "@noted/prettier-config"
+}

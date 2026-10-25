@@ -83,6 +83,7 @@ export async function presignPut(
   key: string,
   contentType: string,
   byteSize: number,
+  checksum?: string,
 ): Promise<UploadTicket> {
   await ensureBucket();
   const url = await getSignedUrl(
@@ -92,6 +93,7 @@ export async function presignPut(
       Key: key,
       ContentType: contentType,
       ContentLength: byteSize,
+      ...(checksum ? { ChecksumSHA256: checksum } : {}),
     }),
     { expiresIn: PUT_URL_TTL_SECONDS },
   );
@@ -130,6 +132,18 @@ export async function objectExists(key: string): Promise<boolean> {
     return true;
   } catch (error) {
     if (error instanceof NotFound) return false;
+    throw error;
+  }
+}
+
+export async function inspectObject(key: string) {
+  try {
+    const result = await s3().send(
+      new HeadObjectCommand({ Bucket: mediaEnv().bucket, Key: key }),
+    );
+    return { byteSize: result.ContentLength, contentType: result.ContentType };
+  } catch (error) {
+    if (isMissingKey(error)) return null;
     throw error;
   }
 }

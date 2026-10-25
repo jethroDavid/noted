@@ -1,5 +1,7 @@
 "use client";
 
+import type { AuthState } from "@noted/experience/platform/auth/auth-provider";
+import { AuthContext } from "@noted/experience/src";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   signOut as firebaseSignOut,
@@ -8,8 +10,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
 } from "firebase/auth";
-import type { User } from "firebase/auth";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { isNativeShell } from "../device";
 import {
@@ -18,19 +19,7 @@ import {
   webAuth,
 } from "./firebase-client";
 
-export type AuthState =
-  | { status: "unconfigured"; user: null }
-  | { status: "loading"; user: null }
-  | { status: "signed-out"; user: null }
-  | { status: "signed-in"; user: User };
-
-export type AuthContextValue = AuthState & {
-  error: string | null;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+export { useAuth } from "@noted/experience/src";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -99,10 +88,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth(): AuthContextValue {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error("useAuth must be used inside AuthProvider.");
-  return value;
 }

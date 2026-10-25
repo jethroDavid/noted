@@ -35,7 +35,8 @@
     "react-dom": "catalog:react19",
     "server-only": "catalog:",
     "superjson": "^2.2.6",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@noted/experience": "workspace:*"
   },
   "devDependencies": {
     "@noted/eslint-config": "workspace:*",

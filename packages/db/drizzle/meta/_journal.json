@@ -28,6 +28,20 @@
       "when": 1792884404896,
       "tag": "0003_outgoing_kronos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792905635850,
+      "tag": "0004_charming_jubilee",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792909669238,
+      "tag": "0005_powersync_media_publication",
+      "breakpoints": true
     }
   ],
   "version": "7"

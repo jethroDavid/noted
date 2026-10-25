@@ -1,16 +1,27 @@
 "use client";
 
-import type { NoteOperation, NoteOutcome } from "@noted/validators/sync";
-import { noteOperationSchema, noteOutcomeSchema } from "@noted/validators/sync";
+import type {
+  MediaOperation,
+  NoteOperation,
+  NoteOutcome,
+} from "@noted/validators/sync";
+import {
+  mediaOperationSchema,
+  noteOperationSchema,
+  noteOutcomeSchema,
+} from "@noted/validators/sync";
 import type {
   CommonPowerSyncDatabase,
   PowerSyncBackendConnector,
 } from "@powersync/common";
+import { diagnostic } from "./diagnostics";
+import { markHomeRevoked } from "./policy";
 
 export interface NoteSyncTransport {
   // The shell binds a typed tRPC client and credentials to one account.
   fetchCredentials(): Promise<{ endpoint: string; token: string }>;
   applyNote(operation: NoteOperation): Promise<NoteOutcome>;
+  applyMedia?(operation: MediaOperation): Promise<NoteOutcome>;
   isActive(): boolean;
 }
 
@@ -35,12 +46,30 @@ export function createNoteConnector(
       for (const entry of transaction.crud) {
         // Missing context is a bug/incompatible client, never a reason to
         // acknowledge and lose the operation.
-        if (entry.table !== "posts" || !entry.metadata)
+        if (
+          !["posts", "media_assets", "reels", "book_entries"].includes(
+            entry.table,
+          ) ||
+          !entry.metadata
+        )
           throw new Error(
             "Unsupported queued operation; update or repair the app before syncing.",
           );
-        const operation = noteOperationSchema.parse(JSON.parse(entry.metadata));
-        if (entry.id !== operation.postId)
+        const raw = JSON.parse(entry.metadata);
+        const media = mediaOperationSchema.safeParse(raw);
+        const operation = media.success
+          ? media.data
+          : noteOperationSchema.parse(raw);
+        const itemId =
+          "postId" in operation ? operation.postId : operation.itemId;
+        if (
+          entry.id !== itemId &&
+          !("assetId" in operation && entry.id === operation.assetId) &&
+          !(
+            "archivedItemId" in operation &&
+            entry.id === operation.archivedItemId
+          )
+        )
           throw new Error("Queued operation does not match its note.");
         assertActive();
         const revoked = await database.getOptional(
@@ -49,20 +78,19 @@ export function createNoteConnector(
         );
         const result = revoked
           ? { code: "ACCESS_REVOKED" as const }
-          : await transport.applyNote(operation);
+          : "postId" in operation
+            ? await transport.applyNote(operation)
+            : transport.applyMedia
+              ? await transport.applyMedia(operation)
+              : (() => {
+                  throw new Error("Media synchronization is not configured.");
+                })();
         const outcome = noteOutcomeSchema.parse(result);
         assertActive();
         await database.writeTransaction(async (tx) => {
+          await diagnostic(tx, "metadata", outcome.code, operation.operationId);
           if (outcome.code === "ACCESS_REVOKED") {
-            await tx.execute(
-              "INSERT OR IGNORE INTO revoked_homes (id, notified) VALUES (?, 0)",
-              [operation.homeId],
-            );
-            // Recovery copies belonging to the revoked home follow the
-            // same discard policy. No note text enters the notice.
-            await tx.execute("DELETE FROM note_outcomes WHERE home_id = ?", [
-              operation.homeId,
-            ]);
+            await markHomeRevoked(tx, operation.homeId);
           } else if (outcome.code !== "ACCEPTED") {
             await tx.execute(
               `INSERT OR REPLACE INTO note_outcomes
@@ -71,7 +99,7 @@ export function createNoteConnector(
               [
                 operation.operationId,
                 operation.homeId,
-                operation.postId,
+                itemId,
                 outcome.code,
                 JSON.stringify(operation),
                 JSON.stringify(outcome),
@@ -79,6 +107,9 @@ export function createNoteConnector(
               ],
             );
           }
+          await tx.execute("DELETE FROM note_pending WHERE id = ?", [
+            operation.operationId,
+          ]);
         });
       }
       // Transport exceptions keep the transaction pending. Terminal domain

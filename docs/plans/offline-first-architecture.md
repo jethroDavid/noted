@@ -1,6 +1,10 @@
 # Offline-first architecture
 
-Status: implementation started 2026-10-25. The storage and server text protocol are implemented; native shell, UI, account lifecycle, media, and live service integration remain pending. The design was reviewed on 2026-10-24. See the implementation checkpoint below for actual evidence.
+Status: shared native scenes, SQLite text/media workflows, attachment storage,
+server acceptance, and recovery are implemented locally as of 2026-10-25. Live
+development browser text/photo sync has passed. Physical-device and packaged
+offline acceptance remain pending. See the latest checkpoint below; earlier
+checkpoints preserve the evidence available at that time.
 
 This document connects the decisions from our architecture discussion. **Agreed** means a product decision from that discussion. **Recommended** means a concrete engineering choice proposed here to make those decisions work. **Verify** means an assumption with an experiment attached; it is not a proven capability of this app.
 
@@ -275,3 +279,125 @@ This is a foundation checkpoint, not a completed offline app. The current native
 Production Vercel builds now have a source-controlled release hook: compile the app, apply committed Drizzle migrations, and publish only after both succeed. Preview/development builds skip migrations; unknown deployment environments fail closed. The runner uses existing Vercel database credentials, resolves Neon pooled hostnames to their direct counterpart for the migration session, and serializes releases with a PostgreSQL advisory lock. An optional `MIGRATION_DATABASE_URL` supports a separate schema-management role. See [database releases](../deployment.md#database-releases-automatic).
 
 Fifteen new checks cover release ordering/failure, preview isolation, connection selection, concurrent migration application, failed-SQL rollback, lock release, and the real deployment CLI. All 153 repository tests passed with local services, and affected lint/type checks passed. This hook is implemented locally and takes effect after it is committed and pushed; it has not applied changes to live Neon from this workspace.
+
+## 15. Local native integration — 2026-10-25
+
+The automatic database release was subsequently pushed and Vercel reported a
+successful production deployment. The following native integration is local work
+and has not been pushed or deployed.
+
+Android and Electron now build a locally bundled first text workspace from
+`packages/native-client`. Platform shells supply Firebase Auth, database creation,
+and system-browser opening. Android uses PowerSync Capacitor with native Community
+SQLite; desktop uses PowerSync Web with persistent OPFS. The browser's existing
+online screens remain separate. Native photos/video, full scene UI, and home
+management are not implemented by this text checkpoint.
+
+The native connector opens account/backend-specific storage before networking,
+pins pending boards, watches local SQL, renders pending markers and durable
+outcomes, pauses before logout, and retains account data across logout. The
+system-browser sign-in uses an explicit matching-code approval with a five-minute
+verifier-bound exchange. Firebase custom tokens are marked by the auth seam only
+after checking the underlying verified Google account. Native API origins are
+allowlisted; desktop navigation and local asset paths are contained.
+
+Root `.env` was configured from the user's `noted.env` with the Neon source URL
+and PowerSync endpoint. `noted.env` is ignored by Git. Committed database migrations
+completed successfully against that supplied Neon database. The source branch
+must match the PowerSync Development connection; production isolation remains an
+environment configuration responsibility.
+
+Verified: native browser sign-in and SQLite startup; Android plugin synchronization
+and a JDK 21 debug APK build; real desktop OPFS save/reload retaining the same
+operation ID and pending queue; Bob's separate empty store and Alice's retained
+store on return. All 158 repository tests passed, including native handoff, token,
+origin, and desktop navigation checks. The isolated fixture never connected to
+Firebase or a backend.
+
+Live PowerSync read/write synchronization passed in the native browser preview:
+authorized homes and existing notes downloaded, a temporary note saved through
+SQLite and the upload queue appeared once in Neon PostgreSQL at revision 1,
+its pending marker cleared, and it remained after reload. The earlier
+`PSYNC_S2105` came from a leading space in the deployed Firebase audience;
+correcting that exact-string mismatch restored the connection. Browser cleanup
+stalled at the delete confirmation, so the clearly labeled temporary note may
+remain. This preview check does not establish packaged-device acceptance.
+No Android device was connected. Packaged-device cold offline startup, complete
+account-switch/revocation scenarios, physical purge, bounded byte retention,
+media, and V1-V17 remain unverified; do not infer those passes from the build or
+the isolated storage fixture.
+
+## 16. Shared scenes and native media — 2026-10-25
+
+`packages/experience` now owns the illustrated fridge, TV, photobook, motion,
+sound, and capture presentation used by both web and native shells. The web
+retains its online tRPC path. Native content procedures use that same inferred
+router contract with local SQLite reads/writes; remote presence and online
+membership administration stay separate. Native content no longer depends on
+board-event notifications for synchronization.
+
+Local originals persist before the media operation is acknowledged. Stable asset,
+target, and operation IDs bind atomic metadata to the attachment queue. Originals
+transfer separately from text, use checksum-bound upload tickets, and are accepted
+only after object verification and the PostgreSQL commit. Android supplies native
+file storage, streaming transfer, display URLs, and diagnostic sharing. Desktop
+supplies OPFS. Rejected originals can be retained for explicit recovery; confirmed
+revocation discards the affected home's pending work and files with a durable
+notice. Sync-first logout waits for accepted originals and refuses unresolved
+outcomes. Note history is available by month in the shared editor.
+
+Server writers now share receipt/history/tombstone rules. Media processing and
+cleanup use durable PostgreSQL intents with retry/backoff and reference checks.
+Production releases upsert periodic QStash recovery/sweep schedules after a
+successful build and migration. AWS S3 CORS includes the native origins in CDK;
+that infrastructure change has not been deployed from this workspace. Local
+scheduled-recovery tests must invoke the reconcile worker through the existing
+development queue setup.
+
+Initial retention values: seven-day released stream TTL, current UTC archive
+month plus explicitly requested older months, 256 MiB of media files across
+account directories, one-hour unacknowledged-file orphan grace, and media retry
+backoff from ten seconds to one hour. Eviction removes only accepted, invisible,
+unpinned current-account cache. Other accounts remain conservatively protected;
+their eligible cache currently requires switching accounts to reclaim. Metadata
+uses stream retention rather than a hard byte limit. These are explicit initial
+bounds, not measured device capacity guarantees.
+
+Verified: 174 tests passed against real local PostgreSQL, PowerSync SQLite,
+filesystem storage, Redis, and MinIO, including media acceptance/retries,
+original persistence across reopening, held-upload independence, guarded media
+removal/restoration, cache protection/eviction, revoked-file purge, and native
+transfer/playback delegation. Full lint and type checks passed. Android debug APK
+and desktop builds passed. The official stream compiler validates the complete
+configuration. Two video-processing tests timed out during competing checks;
+the complete suite subsequently passed with those builds finished. A final
+PostgreSQL regression check proves that 100 protected pending originals cannot
+starve cleanup of an unreferenced original; eligibility is filtered before the
+cleanup batch limit.
+
+Development Neon has migrations 0004 and 0005 applied. Its `powersync`
+publication was verified to contain exactly the nine intended sync tables after
+the user encountered missing-publication-table errors. Migration 0005 extends an
+existing publication idempotently; fresh publication setup is documented. The
+user deployed the updated streams. A disposable photo then saved locally,
+appeared once in PostgreSQL with original verification, and cleared its native
+pending marker. This establishes that live development path, not all V1-V17.
+
+A subsequent backend-outage check saved a disposable note locally, reloaded the
+native preview with the backend still stopped, and retained both text and pending
+state. PostgreSQL had zero copies during the outage and exactly one at revision 1
+after restarting the backend. Both disposable fixtures were then removed through
+the UI. This tests backend unavailability, not a physical device in airplane mode.
+Final web production compilation and CDK synthesis passed. The Windows unpacked
+package and Android APK include artwork and SQLite assets; scans found none of
+the configured server secrets or private-key/database-URL patterns.
+The two preexisting Home photo originals are absent from configured development
+object storage (HEAD returned 404). Their metadata syncs but their bytes cannot
+download; this is separate from the successful newly uploaded fixture path.
+
+Remaining acceptance: physical Android and packaged Windows cold offline startup,
+full account-switch and revoke-during-transfer scenarios, live video playback,
+maximum-video memory measurement, and whole-system crash/recovery runs. No Android
+device was connected for this checkpoint. Native source changes remain local;
+production backend, stream, bucket, and queue configuration must match before
+releasing the native clients.

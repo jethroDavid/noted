@@ -1,23 +1,52 @@
 # PowerSync setup
 
-The first implementation adds the note protocol and local SQLite library. It does not yet replace the native app startup or wire the existing screens to local reads. Photos, video, and their workers keep their current implementation until the media slice.
+The native shells bundle shared illustrated screens with SQLite reads and
+local-first text/media writes. See [native client setup](../packages/native-client/README.md).
+The browser uses the same presentation with online reads and writes.
 
 ## Service configuration
 
 Create a development PowerSync instance and connect it to a development PostgreSQL database with logical replication enabled. The source database must have the repository's schema before validating streams. Production Vercel releases now apply committed Drizzle migrations automatically before publishing the app; local databases use `pnpm db:migrate`. See [database releases](../docs/deployment.md#database-releases-automatic). The source connection must use replication credentials; those credentials never belong in an app bundle.
 
-Deploy [sync-config.yaml](./sync-config.yaml) to that instance. This configuration maps the verified Firebase UID through `users.auth_subject` into current home memberships. Board subscriptions further narrow those authorized rows. Deleted notes are retained as server tombstones but excluded from the synced visible view. Receipt and history tables are not client writable or included in these streams.
+For a new connection, create the explicit replication publication in that source
+database after applying migrations (skip this if PowerSync setup already created
+it):
+
+```sql
+CREATE PUBLICATION powersync FOR TABLE
+  public.users, public.home_memberships, public.homes, public.boards,
+  public.posts, public.reels, public.book_entries, public.media_assets,
+  public.note_revisions;
+```
+
+Migration `0005_powersync_media_publication` adds the media and revision tables to
+an existing publication. It tolerates tables already included and skips databases
+without a PowerSync publication, such as isolated tests. It does not replace an
+existing publication or include receipts and worker intents. Run `pnpm db:migrate`
+against the configured development source before validating updated streams;
+production applies the same migration during its existing release step. The
+migration role must own the publication and tables.
+
+Deploy [sync-config.yaml](./sync-config.yaml) to that instance. This configuration maps the verified Firebase UID through `users.auth_subject` into current home memberships. Board, home/month, and note/month subscriptions further narrow those authorized rows. Deleted items are retained as server tombstones but excluded from the synced visible view. Note history has its own authorized read stream; receipts and worker intents are never included. Client writes use the backend's validated operations, rather than trusting stream access to authorize writes.
 
 Configure Firebase authentication on the service:
 
 - JWKS URI: `https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com`
 - JWT audience: the Firebase project ID.
 
-The shell's connector uses the signed-in account's current Firebase ID token. It must bind that account, its database, and its typed tRPC client together. Call `sync.configuration` to obtain the configured endpoint and `sync.applyNote` to apply each queued domain operation. Set `POWERSYNC_URL` on the backend once the instance is configured.
+The native connector binds the Firebase account, its database, and its typed tRPC
+client together. It calls `sync.configuration` for the endpoint and
+`sync.applyNote` for queued operations. Set `POWERSYNC_URL` in root `.env` locally
+and in the backend's Vercel environment. The local backend must use the same Neon
+source database as this instance; Docker PostgreSQL remains available for tests.
 
-Subscribe to `board_notes` with `{ board_id: boardId }` for an opened board. Keep subscriptions needed by pending mutations until reconciliation completes. The app must watch local data and render local outcomes/revocation notices; these screen and account-lifecycle integrations are the next checkpoint.
+The client subscribes to `board_notes` with `{ board_id: boardId }`, `home_media`
+with `{ home_id: homeId, month: 'YYYY-MM' }`, and `note_history` by note/month.
+`media_item` pins pending targets and originals. It watches local data and renders
+outcomes and revocation notices. Retention and device acceptance are described in
+the native guide.
 
-This configuration follows the official [Firebase authentication](https://docs.powersync.com/configuration/auth/firebase-auth), [Sync Streams](https://docs.powersync.com/sync/streams/quickstart), and [CTE](https://docs.powersync.com/sync/streams/ctes) documentation. It has not been validated or deployed against a live PowerSync instance yet.
+This configuration follows the official [Firebase authentication](https://docs.powersync.com/configuration/auth/firebase-auth), [Sync Streams](https://docs.powersync.com/sync/streams/quickstart), and [CTE](https://docs.powersync.com/sync/streams/ctes) documentation. Complete live authorization and replication tests before treating the instance as verified.
 
 ## Local checks
 

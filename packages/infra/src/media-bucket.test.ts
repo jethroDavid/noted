@@ -47,13 +47,18 @@ describe("MediaBucketStack", () => {
     });
   });
 
-  it("opens CORS only to the production origin for GET and PUT", () => {
+  it("opens CORS only to the web and bundled native origins for GET and PUT", () => {
     template().hasResourceProperties("AWS::S3::Bucket", {
       CorsConfiguration: {
         CorsRules: [
           {
             AllowedMethods: ["GET", "PUT"],
-            AllowedOrigins: [APP_URL],
+            AllowedOrigins: [
+              APP_URL,
+              "https://localhost",
+              "capacitor://localhost",
+              "noted://app",
+            ],
             AllowedHeaders: ["*"],
             MaxAge: 3000,
           },

@@ -19,3 +19,4 @@ export { publishJob } from "./publish";
 export type { PublishOutcome } from "./publish";
 export { verifyWorkerRequest } from "./verify";
 export type { WorkerVerification } from "./verify";
+export { ensureWorkerSchedules } from "./schedules";

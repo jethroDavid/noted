@@ -13,3 +13,5 @@
    the shared visuals package explicitly — otherwise classes used solely
    by @noted/ui (stage aspect, modal chrome) are never generated. */
 @source "../../packages/ui/src";
+
+@source "../../packages/experience/src";

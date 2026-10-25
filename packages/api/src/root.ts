@@ -4,6 +4,7 @@ import { helloRouter } from "./routers/hello";
 import { homesRouter } from "./routers/homes";
 import { meRouter } from "./routers/me";
 import { mediaRouter } from "./routers/media";
+import { nativeAuthRouter } from "./routers/native-auth";
 import { syncRouter } from "./routers/sync";
 import { router } from "./trpc";
 
@@ -13,6 +14,7 @@ export const appRouter = router({
   homes: homesRouter,
   boards: boardsRouter,
   media: mediaRouter,
+  nativeAuth: nativeAuthRouter,
   sync: syncRouter,
 });
 

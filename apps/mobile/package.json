@@ -3,20 +3,36 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "cap sync android",
-    "sync": "cap sync android",
+    "build": "vite build && cap sync android",
+    "sync": "vite build && cap sync android",
+    "sync:local": "vite build --mode development && cap sync android",
+    "run:local": "vite build --mode development && cap sync android && cap run android",
     "open:android": "cap open android",
-    "run:android": "cap sync android && cap run android",
-    "build:apk": "cap sync android && cd android && (gradlew assembleDebug || ./gradlew assembleDebug)",
+    "run:android": "vite build && cap sync android && cap run android",
+    "build:apk": "vite build && cap sync android && cd android && (gradlew assembleDebug || ./gradlew assembleDebug)",
     "assets": "capacitor-assets generate --android --iconBackgroundColor #2A6090 --splashBackgroundColor #2A6090",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev": "vite"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.0",
     "@capacitor/android": "^8.0.0",
+    "@capacitor/browser": "^8.0.0",
     "@capacitor/camera": "^8.2.5",
-    "@capacitor/core": "^8.0.0"
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/file-transfer": "^2.0.6",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
+    "@noted/native-client": "workspace:*",
+    "@noted/offline": "workspace:*",
+    "@powersync/capacitor": "^0.9.4",
+    "@powersync/common": "^2.4.0",
+    "@powersync/web": "^2.5.0",
+    "firebase": "catalog:",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.0",
@@ -25,7 +41,10 @@
     "@noted/prettier-config": "workspace:*",
     "@noted/tsconfig": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "typescript": "catalog:",
+    "vite": "^8.3.5"
   },
   "prettier": "@noted/prettier-config"
 }

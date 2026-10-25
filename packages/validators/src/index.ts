@@ -66,8 +66,8 @@ export const updatePostPositionSchema = z.object({
   x: normalizedCoordinateSchema,
   y: normalizedCoordinateSchema,
 });
-// Restores a just-deleted text note with its original identity, content,
-// position, and creation time, so Undo returns it exactly as it was.
+// Undo copies a deleted note's content and position into a fresh identity.
+// The original ID remains tombstoned, so a late offline edit cannot resurrect it.
 export const restorePostSchema = z.object({
   postId: postIdSchema,
   text: postTextSchema,
@@ -77,8 +77,8 @@ export const restorePostSchema = z.object({
   y: normalizedCoordinateSchema,
   createdAt: z.date(),
 });
-// Restores a just-archived photo note with its original identity, position,
-// and creation time. The image itself is recovered server-side from the book
+// Restores a just-archived photo into a fresh post identity at its old position.
+// The image itself is recovered server-side from the book
 // entry written by the archive, so the client sends no media reference.
 export const restorePhotoPostSchema = z.object({
   postId: postIdSchema,
@@ -95,6 +95,8 @@ export const restoreAnyPostSchema = z.discriminatedUnion("kind", [
 ]);
 
 const textPostSchema = z.object({
+  pending: z.boolean().optional(),
+  revision: z.number().int().positive().optional(),
   id: z.uuid(),
   boardId: z.uuid(),
   kind: z.literal("text"),
@@ -117,6 +119,10 @@ export const mediaDisplayStatusSchema = z.enum([
 ]);
 
 const photoPostSchema = z.object({
+  pending: z.boolean().optional(),
+  unavailable: z.boolean().optional(),
+  revision: z.number().int().positive().optional(),
+  assetId: z.uuid().optional(),
   id: z.uuid(),
   boardId: z.uuid(),
   kind: z.literal("photo"),
@@ -192,6 +198,7 @@ export const requestUploadSchema = z
     kind: z.enum(["photo", "video"]),
     contentType: z.string().min(1),
     byteSize: z.number().int().positive(),
+    checksum: z.string().regex(/^[A-Za-z0-9+/]{43}=$/),
   })
   .superRefine((input, ctx) => {
     const rules = UPLOAD_RULES[input.kind];
@@ -231,6 +238,10 @@ export const createReelSchema = z.object({ assetId: assetIdSchema });
 export const confirmUploadSchema = z.object({ assetId: assetIdSchema });
 
 export const reelSchema = z.object({
+  pending: z.boolean().optional(),
+  unavailable: z.boolean().optional(),
+  revision: z.number().int().positive().optional(),
+  assetId: z.uuid().optional(),
   id: reelIdSchema,
   homeId: homeIdSchema,
   status: mediaDisplayStatusSchema,
@@ -247,6 +258,10 @@ export const reelSchema = z.object({
 export const reelsResponseSchema = z.object({ reels: z.array(reelSchema) });
 
 const photoBookEntrySchema = z.object({
+  pending: z.boolean().optional(),
+  revision: z.number().int().positive().optional(),
+  assetId: z.uuid().optional(),
+  unavailable: z.boolean().optional(),
   kind: z.literal("photo"),
   id: bookEntryIdSchema,
   thumbnailUrl: z.string().min(1),
@@ -254,6 +269,10 @@ const photoBookEntrySchema = z.object({
   archivedAt: z.date(),
 });
 const clipBookEntrySchema = z.object({
+  pending: z.boolean().optional(),
+  revision: z.number().int().positive().optional(),
+  assetId: z.uuid().optional(),
+  unavailable: z.boolean().optional(),
   kind: z.literal("clip"),
   id: bookEntryIdSchema,
   // Null for posterless clips (poster generation failed): the page shows a

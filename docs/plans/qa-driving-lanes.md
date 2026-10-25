@@ -183,14 +183,14 @@ built only if an experimental API proves insufficient.
 
 - P0: `node qa/lanes/up.js` then `node qa/lanes/doctor.js` report
   `ok`; `node qa/pw/drive.js --lane chrome-1 -e "<open home, return
-  counts>"` returns live data; `npx playwright test` from `qa/pw`
+counts>"` returns live data; `npx playwright test` from `qa/pw`
   is green; `pnpm check` is green; one trial brief runs on one lane
   and its finding verifies against `git show`.
 - P1 (highest risk — experimental WebView attach plus TabLogs'
   WebView quirks may recur): attach, force-stop plus relaunch,
   re-attach with the session surviving; reload-logout probe decides
   the RUNBOOK row; `@native` specs pass twice in a row (`--repeat-
-  each 2`, a split is a finding); trial two-lane job completes.
+each 2`, a split is a finding); trial two-lane job completes.
 - P2: launch, window handle, persistent session across relaunch;
   specs green on the `electron` project; trial job completes.
 - P3: Appium session on the simulator, WebView context listed, one

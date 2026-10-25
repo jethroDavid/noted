@@ -24,6 +24,10 @@ export async function saveNoteOperation(
       );
       if (existing) throw new Error("That note already exists on this device.");
       await tx.execute(
+        "INSERT INTO note_pending (id, home_id, post_id) VALUES (?, ?, ?)",
+        [operation.operationId, operation.homeId, operation.postId],
+      );
+      await tx.execute(
         `INSERT INTO posts
         (id, board_id, kind, text_content, foreground_color, background_color, position_x, position_y, revision, created_at, updated_at, _metadata)
         VALUES (?, ?, 'text', ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
@@ -48,6 +52,10 @@ export async function saveNoteOperation(
     );
     if (!post)
       throw new Error("This note is not available for editing on this device.");
+    await tx.execute(
+      "INSERT INTO note_pending (id, home_id, post_id) VALUES (?, ?, ?)",
+      [operation.operationId, operation.homeId, operation.postId],
+    );
     if (operation.kind === "edit") {
       const columns = {
         text: "text_content",

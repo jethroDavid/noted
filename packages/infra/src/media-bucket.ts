@@ -31,7 +31,12 @@ export class MediaBucketStack extends Stack {
       cors: [
         {
           allowedMethods: [HttpMethods.GET, HttpMethods.PUT],
-          allowedOrigins: [props.appUrl],
+          allowedOrigins: [
+            props.appUrl,
+            "https://localhost",
+            "capacitor://localhost",
+            "noted://app",
+          ],
           allowedHeaders: ["*"],
           maxAge: 3000,
         },

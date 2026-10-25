@@ -2,12 +2,14 @@ import "server-only";
 import { z } from "zod";
 
 export const processMediaJobSchema = z.object({
+  workId: z.string().optional(),
   job: z.literal("process-media"),
   homeId: z.uuid(),
   assetId: z.uuid(),
 });
 
 export const cleanupMediaJobSchema = z.object({
+  workId: z.string().optional(),
   job: z.literal("cleanup-media"),
   homeId: z.uuid(),
   assetId: z.uuid(),
@@ -22,6 +24,7 @@ export const sweepReelsJobSchema = z.object({
 });
 
 export const jobEnvelopeSchema = z.discriminatedUnion("job", [
+  z.object({ job: z.literal("reconcile-media") }),
   processMediaJobSchema,
   cleanupMediaJobSchema,
   sweepReelsJobSchema,
@@ -35,6 +38,7 @@ export type SweepReelsJob = z.infer<typeof sweepReelsJobSchema>;
 // The single source for publisher URLs; the worker routes live at these
 // paths. A new job adds one envelope variant above and one route here.
 export const WORKER_ROUTES = {
+  "reconcile-media": "/api/workers/reconcile-media",
   "process-media": "/api/workers/process-media",
   "cleanup-media": "/api/workers/cleanup-media",
   "sweep-reels": "/api/workers/sweep-reels",

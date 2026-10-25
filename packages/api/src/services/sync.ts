@@ -10,12 +10,66 @@ import {
 } from "@noted/db/src";
 import type { NoteOperation, NoteOutcome } from "@noted/validators/sync";
 import { noteOperationSchema, noteOutcomeSchema } from "@noted/validators/sync";
-import { and, eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { boardChanged } from "./events";
 import type { CurrentUser } from "./identity";
 
+export async function readNoteHistory(
+  user: CurrentUser,
+  homeId: string,
+  postId: string,
+  options: { month?: string; beforeRevision?: number } = {},
+) {
+  const [post] = await db
+    .select({ id: posts.id })
+    .from(posts)
+    .innerJoin(boards, eq(boards.id, posts.boardId))
+    .innerJoin(homeMemberships, eq(homeMemberships.homeId, boards.homeId))
+    .where(
+      and(
+        eq(posts.id, postId),
+        eq(boards.homeId, homeId),
+        eq(homeMemberships.userId, user.id),
+      ),
+    );
+  if (!post)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Note not found." });
+  const from = options.month
+    ? new Date(`${options.month}-01T00:00:00Z`)
+    : undefined;
+  const until = from
+    ? new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1))
+    : undefined;
+  const revisions = await db
+    .select({
+      revision: noteRevisions.revision,
+      text: noteRevisions.text,
+      foregroundColor: noteRevisions.foregroundColor,
+      backgroundColor: noteRevisions.backgroundColor,
+      createdAt: noteRevisions.createdAt,
+    })
+    .from(noteRevisions)
+    .where(
+      and(
+        eq(noteRevisions.postId, postId),
+        from ? gte(noteRevisions.createdAt, from) : undefined,
+        until ? lt(noteRevisions.createdAt, until) : undefined,
+        options.beforeRevision
+          ? lt(noteRevisions.revision, options.beforeRevision)
+          : undefined,
+      ),
+    )
+    .orderBy(desc(noteRevisions.revision))
+    .limit(101);
+  return {
+    revisions: revisions.slice(0, 100),
+    hasMore: revisions.length > 100,
+  };
+}
+
 // Canonical JSON makes receipt identity independent of transport key order.
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     return `{${Object.entries(value)
@@ -202,6 +256,11 @@ export async function applyNoteOperation(
           backgroundColor: post.backgroundColor,
         });
       }
+      if (operation.kind === "create")
+        await tx
+          .update(boards)
+          .set({ postAdditions: sql`${boards.postAdditions} + 1` })
+          .where(eq(boards.id, board.id));
       return finish({ code: "ACCEPTED", revision: post.revision });
     },
   );

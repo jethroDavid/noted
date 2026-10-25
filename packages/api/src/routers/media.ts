@@ -14,6 +14,7 @@ import {
 } from "@noted/validators/src";
 import { z } from "zod";
 import {
+  cancelUpload,
   confirmUpload,
   createReel,
   deleteBookEntry,
@@ -28,6 +29,11 @@ import { protectedProcedure, router } from "../trpc";
 const homeInput = z.object({ homeId: homeIdSchema });
 
 export const mediaRouter = router({
+  cancelUpload: protectedProcedure
+    .input(homeInput.extend({ assetId: assetIdSchema }))
+    .mutation(({ ctx, input }) =>
+      cancelUpload(ctx.user, input.homeId, input.assetId),
+    ),
   // The schema is used whole (never .shape-extended): its superRefine
   // checks would not survive the split.
   requestUpload: protectedProcedure
@@ -38,6 +44,7 @@ export const mediaRouter = router({
         kind: input.kind,
         contentType: input.contentType,
         byteSize: input.byteSize,
+        checksum: input.checksum,
       }),
     ),
 
@@ -66,17 +73,37 @@ export const mediaRouter = router({
     .query(async ({ ctx, input }) => listBook(ctx.user, input.homeId)),
 
   deleteReel: protectedProcedure
-    .input(homeInput.extend({ reelId: reelIdSchema }))
+    .input(
+      homeInput.extend({
+        reelId: reelIdSchema,
+        expectedRevision: z.number().int().positive().optional(),
+        operationId: z.uuid().optional(),
+      }),
+    )
     .output(z.object({ reelId: reelIdSchema }))
     .mutation(async ({ ctx, input }) =>
-      deleteReel(ctx.user, input.homeId, { reelId: input.reelId }),
+      deleteReel(ctx.user, input.homeId, {
+        reelId: input.reelId,
+        expectedRevision: input.expectedRevision,
+        operationId: input.operationId,
+      }),
     ),
 
   deleteBookEntry: protectedProcedure
-    .input(homeInput.extend({ entryId: bookEntryIdSchema }))
+    .input(
+      homeInput.extend({
+        entryId: bookEntryIdSchema,
+        expectedRevision: z.number().int().positive().optional(),
+        operationId: z.uuid().optional(),
+      }),
+    )
     .output(z.object({ entryId: bookEntryIdSchema }))
     .mutation(async ({ ctx, input }) =>
-      deleteBookEntry(ctx.user, input.homeId, { entryId: input.entryId }),
+      deleteBookEntry(ctx.user, input.homeId, {
+        entryId: input.entryId,
+        expectedRevision: input.expectedRevision,
+        operationId: input.operationId,
+      }),
     ),
 
   // No .output(), mirroring boards.onEvent: watchHome validates every

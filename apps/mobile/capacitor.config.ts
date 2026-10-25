@@ -1,21 +1,27 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type { CapacitorConfig } from "@capacitor/cli";
 
-// Thin wrapper: the app loads production in a native webview. All API and
-// realtime traffic stays on plain HTTPS/SSE at {APP_URL}/api/trpc, so the
-// existing tRPC links run untouched inside the webview.
+const manifest = resolve("dist/native-config.json");
+const apiUrl = existsSync(manifest)
+  ? (JSON.parse(readFileSync(manifest, "utf8")) as { apiUrl: string }).apiUrl
+  : "https://noted-six-chi.vercel.app";
+const localDevelopment =
+  new URL(apiUrl).protocol === "http:" &&
+  new URL(apiUrl).hostname === "localhost";
+
+// The installed application starts from bundled assets, including offline.
 const config: CapacitorConfig = {
   appId: "com.noted.app",
   appName: "Noted",
-  webDir: "www",
+  webDir: "dist",
   server: {
-    url: "https://noted-six-chi.vercel.app",
-    cleartext: false,
-    // Firebase Google sign-in redirects through Google's OAuth pages; keep
-    // those navigations inside the webview so the redirect returns to the app.
-    allowNavigation: ["accounts.google.com", "*.firebaseapp.com"],
+    cleartext: localDevelopment,
+    hostname: "localhost",
+    androidScheme: localDevelopment ? "http" : "https",
   },
   android: {
-    allowMixedContent: false,
+    allowMixedContent: localDevelopment,
   },
 };
 

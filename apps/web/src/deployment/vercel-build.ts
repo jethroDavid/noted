@@ -3,10 +3,12 @@ import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { ensureWorkerSchedules } from "@noted/queue/src";
 
 interface BuildOperations {
   build(): void | Promise<void>;
   migrate(): void | Promise<void>;
+  configureWorkers?(): void | Promise<void>;
 }
 
 export async function runVercelBuild(
@@ -23,6 +25,7 @@ export async function runVercelBuild(
   await operations.build();
   if (environment === "production") {
     await operations.migrate();
+    await operations.configureWorkers?.();
   } else {
     console.log(
       "Skipping database migrations for this non-production deployment.",
@@ -46,6 +49,7 @@ if (
   try {
     const require = createRequire(import.meta.url);
     await runVercelBuild(process.env.VERCEL_ENV, {
+      configureWorkers: ensureWorkerSchedules,
       build: () =>
         run(process.execPath, [require.resolve("next/dist/bin/next"), "build"]),
       migrate: () =>

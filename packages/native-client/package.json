@@ -1,0 +1,45 @@
+{
+  "name": "@noted/native-client",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./src": "./src/index.tsx",
+    "./vite": "./vite-config.ts"
+  },
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noted/api": "workspace:*",
+    "@noted/experience": "workspace:*",
+    "@noted/offline": "workspace:*",
+    "@noted/tailwind-config": "workspace:*",
+    "@noted/ui": "workspace:*",
+    "@noted/validators": "workspace:*",
+    "@powersync/common": "^2.4.0",
+    "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "@trpc/tanstack-react-query": "catalog:",
+    "firebase": "catalog:",
+    "react": "catalog:react19",
+    "react-dom": "catalog:react19",
+    "superjson": "^2.2.6"
+  },
+  "devDependencies": {
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "@powersync/node": "1.2.0",
+    "@tailwindcss/vite": "^4.1.16",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:react19",
+    "@types/react-dom": "catalog:react19",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "^8.3.5"
+  },
+  "prettier": "@noted/prettier-config"
+}
