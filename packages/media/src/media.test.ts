@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -73,6 +73,37 @@ describe("object storage", () => {
       const get = await fetch(getUrl);
       expect(get.status).toBe(200);
       expect(Buffer.from(await get.arrayBuffer())).toEqual(bytes);
+    } finally {
+      await deleteUploadBlobs([key]);
+    }
+  });
+
+  it("signs the explicit checksum header used by native binary uploads", async () => {
+    const key = `homes/test-home/originals/${randomUUID()}.bin`;
+    const bytes = Buffer.from("native checksum regression"),
+      checksum = createHash("sha256").update(bytes).digest("base64");
+    try {
+      const ticket = await presignPut(
+        key,
+        "application/octet-stream",
+        bytes.length,
+        checksum,
+      );
+      const url = new URL(ticket.url);
+      expect(url.searchParams.get("X-Amz-SignedHeaders")?.split(";")).toContain(
+        "x-amz-checksum-sha256",
+      );
+      expect(url.searchParams.has("x-amz-checksum-sha256")).toBe(false);
+      const result = await fetch(ticket.url, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "x-amz-checksum-sha256": checksum,
+        },
+        body: bytes,
+      });
+      expect(result.status).toBe(200);
+      expect(await getObjectBytes(key)).toEqual(bytes);
     } finally {
       await deleteUploadBlobs([key]);
     }

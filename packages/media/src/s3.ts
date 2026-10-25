@@ -95,7 +95,13 @@ export async function presignPut(
       ContentLength: byteSize,
       ...(checksum ? { ChecksumSHA256: checksum } : {}),
     }),
-    { expiresIn: PUT_URL_TTL_SECONDS },
+    {
+      expiresIn: PUT_URL_TTL_SECONDS,
+      // Android sends this as a header. Bind that header in the signature;
+      // the presigner otherwise hoists it into the query and S3 rejects the
+      // additional unsigned x-amz-checksum-sha256 header with HTTP 403.
+      unhoistableHeaders: new Set(["x-amz-checksum-sha256"]),
+    },
   );
   return { key, url };
 }
