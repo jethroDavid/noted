@@ -52,6 +52,8 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     services:
       postgres:
         image: postgres:18-alpine
@@ -85,25 +87,44 @@ jobs:
       S3_SECRET_ACCESS_KEY: notednoted
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Setup
         uses: ./tooling/github/setup
       - name: Copy env
         shell: bash
         run: cp .env.example .env
-      # MinIO runs as a plain container (not a service): its image needs
-      # an explicit `server` command, which services cannot pass.
+      # Community container images are no longer available. Build the pinned
+      # official source release; production continues to use AWS S3.
+      - name: Set up Go for test storage
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.8"
+          cache: false
+      - name: Build test storage
+        env:
+          CGO_ENABLED: "0"
+          GOTOOLCHAIN: local
+          GOPROXY: https://proxy.golang.org
+          GOSUMDB: sum.golang.org
+        run: |
+          mkdir -p "$RUNNER_TEMP/noted-minio/bin"
+          # Official RELEASE.2025-10-15T17-29-55Z, pinned to its immutable commit.
+          GOBIN="$RUNNER_TEMP/noted-minio/bin" go install github.com/minio/minio@9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
       - name: Start MinIO
         shell: bash
+        env:
+          MINIO_ROOT_USER: noted
+          MINIO_ROOT_PASSWORD: notednoted
         run: |
-          docker run -d --name minio -p 9000:9000 \
-            -e MINIO_ROOT_USER=noted \
-            -e MINIO_ROOT_PASSWORD=notednoted \
-            minio/minio:latest server /data
+          "$RUNNER_TEMP/noted-minio/bin/minio" server "$RUNNER_TEMP/noted-minio/data" \
+            --address 127.0.0.1:9000 --console-address 127.0.0.1:9001 \
+            > "$RUNNER_TEMP/noted-minio/server.log" 2>&1 &
           for _ in $(seq 1 24); do
             curl -sf http://localhost:9000/minio/health/live && break
             sleep 5
           done
-          curl -sf http://localhost:9000/minio/health/live
+          curl -sf http://localhost:9000/minio/health/live || { cat "$RUNNER_TEMP/noted-minio/server.log"; exit 1; }
       - name: Test
         run: pnpm test
 
