@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "generate": "node --conditions=react-server ./node_modules/drizzle-kit/bin.cjs generate",
-    "migrate": "dotenv -e ../../.env -- node --conditions=react-server ./node_modules/drizzle-kit/bin.cjs migrate",
+    "migrate": "dotenv -e ../../.env -- node --conditions=react-server --import tsx src/migrate.ts",
+    "migrate:deploy": "node --conditions=react-server --import tsx src/migrate.ts",
     "seed": "dotenv -e ../../.env -- node --conditions=react-server --import tsx src/seed.ts"
   },
   "devDependencies": {
@@ -21,7 +22,8 @@
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
   },
   "prettier": "@noted/prettier-config",
   "dependencies": {

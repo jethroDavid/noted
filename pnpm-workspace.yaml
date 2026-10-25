@@ -32,5 +32,6 @@ catalogs:
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
+  - better-sqlite3
   - electron
   - ffmpeg-static

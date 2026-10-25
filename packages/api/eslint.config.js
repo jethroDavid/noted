@@ -18,6 +18,8 @@ export default [
                 "@noted/ui/**",
                 "@noted/web",
                 "@noted/web/**",
+                "@noted/offline",
+                "@noted/offline/**",
               ],
               message:
                 "packages/api must only import the auth, db, domain, media, queue, realtime, and validators libraries (see README Layout).",

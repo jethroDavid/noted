@@ -53,6 +53,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: noted
+          POSTGRES_PASSWORD: noted
+          POSTGRES_DB: noted_sync_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U noted"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
       redis:
         image: redis:8-alpine
         ports:
@@ -63,6 +76,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      NOTED_SYNC_TEST_DATABASE_URL: postgresql://noted:noted@localhost:5432/noted_sync_test
       REDIS_URL: redis://localhost:6379
       S3_ENDPOINT: http://localhost:9000
       S3_REGION: us-east-1

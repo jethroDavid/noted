@@ -5,6 +5,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -191,6 +192,8 @@ export const posts = pgTable(
         onUpdate: "cascade",
       }),
     kind: postKind("kind").notNull(),
+    revision: integer("revision").notNull().default(1),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     textContent: text("text_content"),
     mediaAssetId: uuid("media_asset_id").references(() => mediaAssets.id, {
       onDelete: "restrict",
@@ -216,6 +219,51 @@ export const posts = pgTable(
     check(
       "posts_content_matches_kind",
       sql`(${table.kind} = 'text' and ${table.textContent} is not null and ${table.mediaAssetId} is null) or (${table.kind} = 'photo' and ${table.textContent} is null and ${table.mediaAssetId} is not null)`,
+    ),
+  ],
+);
+
+// A receipt and the corresponding write commit together. Keep these for
+// arbitrarily late retries from an offline installation.
+export const syncReceipts = pgTable(
+  "sync_receipts",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    operationId: uuid("operation_id").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    outcome: jsonb("outcome").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.operationId] })],
+);
+
+export const noteRevisions = pgTable(
+  "note_revisions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id),
+    revision: integer("revision").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    operationId: uuid("operation_id").notNull(),
+    text: text("text").notNull(),
+    foregroundColor: text("foreground_color").notNull(),
+    backgroundColor: text("background_color").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("note_revisions_post_revision_unique").on(
+      table.postId,
+      table.revision,
     ),
   ],
 );

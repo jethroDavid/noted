@@ -41,7 +41,7 @@ import {
   boardViewerSchema,
 } from "@noted/validators/src";
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { boardChanged, mediaChanged } from "./events";
 import type { CurrentUser } from "./identity";
 import { deleteAssetIfOrphaned, requirePendingUpload } from "./media";
@@ -216,6 +216,7 @@ async function findPostForMember(
         eq(homeMemberships.userId, userId),
         eq(homes.id, homeId),
         eq(posts.id, postId),
+        isNull(posts.deletedAt),
       ),
     )
     .limit(1);
@@ -252,7 +253,7 @@ export async function readBoard(
     .select(withMedia(postColumns))
     .from(posts)
     .leftJoin(mediaAssets, eq(posts.mediaAssetId, mediaAssets.id))
-    .where(eq(posts.boardId, board.id))
+    .where(and(eq(posts.boardId, board.id), isNull(posts.deletedAt)))
     // Array order is stack order (later paints on top), so the board sorts
     // by last touch: moves and edits bump updatedAt, and the note just
     // touched lands on top for every viewer.

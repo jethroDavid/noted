@@ -21,6 +21,13 @@
       "when": 1791028714292,
       "tag": "0002_steep_hawkeye",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792884404896,
+      "tag": "0003_outgoing_kronos",
+      "breakpoints": true
     }
   ],
   "version": "7"

@@ -1,0 +1,28 @@
+{
+  "name": "@noted/offline",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./src": "./src/index.ts"
+  },
+  "scripts": {
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noted/validators": "workspace:*",
+    "@powersync/common": "^2.4.0"
+  },
+  "devDependencies": {
+    "@noted/eslint-config": "workspace:*",
+    "@noted/prettier-config": "workspace:*",
+    "@noted/tsconfig": "workspace:*",
+    "@powersync/node": "^1.2.0",
+    "better-sqlite3": "^12.8.0",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^5.0.1"
+  },
+  "prettier": "@noted/prettier-config"
+}

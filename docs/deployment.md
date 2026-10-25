@@ -26,6 +26,46 @@ log from deploy day, demo media, and what is still pending.
   address.
 - Every env change needs a redeploy to take effect.
 
+## Database releases (automatic)
+
+Production Vercel deployments run **build → database migrations → publish**.
+[apps/web/vercel.json](../apps/web/vercel.json) selects `pnpm build:vercel`;
+the [release script](../apps/web/src/deployment/vercel-build.ts) compiles Next.js,
+then calls `@noted/db migrate:deploy` only when `VERCEL_ENV=production`.
+A failed build leaves the database alone. A failed migration fails the
+deployment, so Vercel keeps serving the previous release. Preview and development
+deployments do not apply production schema changes. An absent or unknown
+`VERCEL_ENV` stops this release command instead of silently skipping migrations.
+
+The [migration runner](../packages/db/src/migrate.ts) uses the database URL
+already configured in Vercel. For Neon it removes the documented `-pooler`
+hostname suffix to use the corresponding direct connection, preserving the
+database, role, password, and SSL options. The application continues using its
+pooled connection. An optional server-only `MIGRATION_DATABASE_URL` can supply
+separate migration credentials; no additional secret is needed when the existing
+role has schema privileges. Never expose either URL through a `NEXT_PUBLIC_*`
+variable or deployment logs.
+
+The runner holds one PostgreSQL session advisory lock across Drizzle's journal
+lookup and migration transaction. Overlapping releases serialize, and reruns
+apply only migrations not already recorded. Connection closure releases the lock
+on success or failure. Local `pnpm db:migrate` uses the same runner with root
+`.env` loading; automated production releases use only their injected environment.
+
+For future schema changes: edit `packages/db/src/schema.ts`, run
+`pnpm db:generate`, commit the schema plus generated SQL and journal/snapshot
+files, then push to `main`. Vercel runs the committed SQL automatically. SQL is
+never generated from the live database during deployment. There is no GitHub
+production database secret to configure and no separate migration workflow.
+
+Migration success is not reversed if a later publish fails or an app version is
+rolled back. Database rollback is a separate deliberate operation. This release
+hook becomes active when these changes are pushed; it has not been run against
+the live Neon database from this workspace.
+
+References: [Vercel build commands](https://vercel.com/docs/project-configuration/vercel-json#buildcommand),
+[Neon pooled/direct connections](https://neon.com/docs/connect/connection-pooling#how-to-use-connection-pooling).
+
 ## Environment variables (Production)
 
 | Variable                                                                            | Value / format                                                      | Source                                              |
@@ -49,7 +89,8 @@ Secrets never enter chat or the repo — Vercel dashboard only.
 ## Service notes
 
 - **Neon**: use the pooled string. The direct host exhausts connections
-  under serverless; the pooler is required.
+  under serverless; the pooler is required for app traffic. The short-lived
+  migration runner uses a direct connection for its session lock.
 - **Upstash Redis**: ioredis enables TLS only via the `rediss://` scheme.
   A `redis://` URL against the TLS endpoint dies with `read ECONNRESET`.
   The user must have full command access — a restricted user fails every

@@ -12,6 +12,16 @@ Start with [PLAN.md](./PLAN.md), then
 [ADR 0005](./docs/decisions/0005-rebuild-on-clean-foundation.md). The project
 `architect` skill gates every structural change.
 
+Offline implementation is tracked in the
+[offline-first architecture](./docs/plans/offline-first-architecture.md).
+The SQLite/server note foundation is implemented; native startup, screen
+integration, and attachments remain in progress. See [PowerSync setup](./powersync/README.md)
+for service configuration and isolated persistence/protocol checks.
+
+Production Vercel releases automatically apply committed database migrations
+after the app builds and before publishing. See
+[database releases](./docs/deployment.md#database-releases-automatic).
+
 ## The demo
 
 One shared family kitchen in a fixed illustrated scene, with Google
@@ -109,6 +119,8 @@ CI mirrors the same six tasks. Nothing merges red.
 - `apps/desktop` — Electron shell: desktop window plus installer.
 - `packages/api` — tRPC routers, the only API definition.
 - `packages/db` — Drizzle schema, client, migrations, seed.
+- `packages/offline` — client-only PowerSync schema, durable note mutations,
+  and sync outcome handling; platform shells supply storage and credentials.
 - `packages/domain` — shared domain rules (removal window, coordinates,
   reel lifetime).
 - `packages/realtime` — Redis-backed realtime (room pub/sub, board cache,

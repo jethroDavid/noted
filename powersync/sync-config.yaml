@@ -1,0 +1,27 @@
+# Firebase's authenticated UID is mapped through users.auth_subject.
+# Client-selected board IDs narrow a view; they never grant membership.
+config:
+  edition: 3
+
+with:
+  member_homes: |
+    SELECT home_id FROM home_memberships
+    WHERE user_id IN (
+      SELECT id FROM users WHERE auth_subject = auth.user_id()
+    )
+
+streams:
+  home_overview:
+    auto_subscribe: true
+    queries:
+      - SELECT id, name, creator_user_id FROM homes WHERE id IN member_homes
+      - SELECT id, home_id, kind, post_additions FROM boards WHERE home_id IN member_homes
+  board_notes:
+    query: |
+      SELECT * FROM posts
+      WHERE board_id = subscription.parameter('board_id')
+        AND board_id IN (
+          SELECT id FROM boards WHERE home_id IN member_homes
+        )
+        AND kind = 'text'
+        AND deleted_at IS NULL

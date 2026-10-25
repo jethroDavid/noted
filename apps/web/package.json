@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:vercel": "node --conditions=react-server --import tsx src/deployment/vercel-build.ts",
     "start": "next start",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint .",
@@ -45,6 +46,7 @@
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
     "tailwindcss": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   },
   "prettier": "@noted/prettier-config"
